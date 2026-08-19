@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   section: {
     id: string
     title: string
@@ -9,6 +9,14 @@ defineProps<{
     confidence: 'high' | 'medium' | 'low' | 'inferred'
   }
   photos: Array<{ id: string; storageKeyThumb: string | null; capturedAt: string | null; locationSource: string }>
+  otherSections: Array<{ id: string; title: string }>
+}>()
+
+const emit = defineEmits<{
+  edit: []
+  delete: []
+  merge: [intoSectionId: string]
+  movePhoto: [photoId: string, sectionId: string]
 }>()
 
 const CONFIDENCE_LABEL: Record<string, string> = {
@@ -16,6 +24,14 @@ const CONFIDENCE_LABEL: Record<string, string> = {
   medium: 'Medium confidence',
   low: 'Low confidence',
   inferred: 'Inferred'
+}
+
+const mergeTarget = ref('')
+function onMergeChange() {
+  if (mergeTarget.value) {
+    emit('merge', mergeTarget.value)
+    mergeTarget.value = ''
+  }
 }
 </script>
 
@@ -34,6 +50,25 @@ const CONFIDENCE_LABEL: Record<string, string> = {
         {{ CONFIDENCE_LABEL[section.confidence] }}
       </span>
     </div>
-    <PhotoPhotoGrid :photos="photos" />
+
+    <PhotoPhotoGrid
+      :photos="photos"
+      :other-sections="otherSections"
+      @move="(photoId: string, sectionId: string) => emit('movePhoto', photoId, sectionId)"
+    />
+
+    <div class="mt-4 flex flex-wrap items-center gap-3 border-t border-(--color-line) pt-3 text-sm text-(--color-ink-soft)">
+      <button class="hover:text-(--color-ink)" @click="emit('edit')">Edit</button>
+      <button class="hover:text-red-600" @click="emit('delete')">Delete</button>
+      <select
+        v-if="otherSections.length"
+        v-model="mergeTarget"
+        class="rounded-md border border-(--color-line) bg-transparent px-2 py-1 text-xs"
+        @change="onMergeChange"
+      >
+        <option value="" disabled>Merge into…</option>
+        <option v-for="s in otherSections" :key="s.id" :value="s.id">{{ s.title }}</option>
+      </select>
+    </div>
   </article>
 </template>

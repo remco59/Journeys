@@ -2,6 +2,7 @@ import { and, eq, or } from 'drizzle-orm'
 import { useDb } from '../../db/client'
 import { photos, journeys } from '../../db/schema'
 import type { ExtractedPhotoMetadata } from './exif'
+import type { UpdatePhotoInput } from '../../../shared/types/photos'
 
 export async function createPendingPhoto(input: { journeyId: string; importFileId: string; storageKeyOriginal: string }) {
   const db = useDb()
@@ -78,6 +79,43 @@ export async function applyExtractedMetadata(
       storageKeyThumb: derived.storageKeyThumb
     })
     .where(eq(photos.id, photoId))
+}
+
+/**
+ * Every field the caller touches becomes both the new value AND a locked
+ * field — this is what makes a manual edit survive future reprocessing
+ * (§12). Moving a photo to a different section, in particular, sets
+ * source='manual' on locationSource only when the location itself changed.
+ */
+export async function updatePhotoWithLocks(photo: typeof photos.$inferSelect, input: UpdatePhotoInput) {
+  const db = useDb()
+  const patch: Partial<typeof photos.$inferInsert> = {}
+  const newLocks = new Set(photo.lockedFields)
+
+  if (input.sectionId !== undefined) {
+    patch.sectionId = input.sectionId
+    newLocks.add('sectionId')
+  }
+  if (input.caption !== undefined) {
+    patch.caption = input.caption
+    newLocks.add('caption')
+  }
+  if (input.capturedAt !== undefined) {
+    patch.capturedAt = new Date(input.capturedAt)
+    newLocks.add('capturedAt')
+  }
+  if (input.lat !== undefined && input.lon !== undefined) {
+    patch.geom = { lat: input.lat, lon: input.lon }
+    patch.locationSource = 'manual'
+    patch.locationConfidence = 'high'
+    newLocks.add('geom')
+  }
+
+  patch.source = 'user_override'
+  patch.lockedFields = [...newLocks]
+
+  const [updated] = await db.update(photos).set(patch).where(eq(photos.id, photo.id)).returning()
+  return updated!
 }
 
 /** "The first suitable uploaded photo can automatically become the cover photo." */

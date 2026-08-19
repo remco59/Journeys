@@ -1,85 +1,21 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import sharp from 'sharp'
-import { ExifTool } from 'exiftool-vendored'
-import { promises as fs } from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
+import {
+  ADMIN_USERNAME,
+  ADMIN_PASSWORD,
+  requireStackReachable,
+  loginCookie,
+  createJourney,
+  uploadPhoto,
+  listPhotos,
+  listSections,
+  clusterNow,
+  waitForAllProcessed,
+  makeJpegAt,
+  closeExifTool
+} from './helpers'
 
-const BASE_URL = process.env.INTEGRATION_BASE_URL || 'http://localhost:3000'
-const ADMIN_USERNAME = process.env.BOOTSTRAP_ADMIN_USERNAME || 'admin'
-const ADMIN_PASSWORD = process.env.BOOTSTRAP_ADMIN_PASSWORD || 'change-me-now'
-
-function extractSessionCookie(res: Response): string {
-  const raw = res.headers.get('set-cookie')
-  if (!raw) throw new Error('Expected a Set-Cookie header')
-  return raw.split(';')[0]
-}
-
-async function loginCookie(username: string, password: string) {
-  const res = await fetch(`${BASE_URL}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ username, password })
-  })
-  if (!res.ok) throw new Error(`login failed: ${res.status}`)
-  return extractSessionCookie(res)
-}
-
-async function createJourney(cookie: string) {
-  const res = await fetch(`${BASE_URL}/api/journeys`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', cookie },
-    body: JSON.stringify({ title: `Sections test ${Date.now()}`, startDate: '2026-08-17', endDate: '2026-08-21' })
-  })
-  return res.json()
-}
-
-async function uploadPhoto(cookie: string, journeyId: string, buffer: Buffer, filename: string) {
-  const form = new FormData()
-  form.append('file', new Blob([buffer], { type: 'image/jpeg' }), filename)
-  const res = await fetch(`${BASE_URL}/api/journeys/${journeyId}/photos`, { method: 'POST', headers: { cookie }, body: form })
-  return res.json()
-}
-
-async function waitForAllProcessed(cookie: string, journeyId: string, expectedCount: number, timeoutMs = 20_000) {
-  const start = Date.now()
-  while (Date.now() - start < timeoutMs) {
-    const res = await fetch(`${BASE_URL}/api/journeys/${journeyId}/photos`, { headers: { cookie } })
-    const photos = await res.json()
-    if (photos.length >= expectedCount && photos.every((p: any) => p.storageKeyThumb)) return photos
-    await new Promise((resolve) => setTimeout(resolve, 400))
-  }
-  throw new Error(`Photos did not finish processing within ${timeoutMs}ms`)
-}
-
-let exiftool: ExifTool
-let baseJpeg: Buffer
-
-async function makeJpegAt(lat: number, lon: number, dateTimeOriginal: string): Promise<Buffer> {
-  const tmp = path.join(os.tmpdir(), `sections-fixture-${Math.random().toString(36).slice(2)}.jpg`)
-  await fs.writeFile(tmp, baseJpeg)
-  await exiftool.write(
-    tmp,
-    { GPSLatitude: lat, GPSLatitudeRef: lat >= 0 ? 'N' : 'S', GPSLongitude: lon, GPSLongitudeRef: lon >= 0 ? 'E' : 'W', DateTimeOriginal: dateTimeOriginal },
-    ['-overwrite_original']
-  )
-  const buf = await fs.readFile(tmp)
-  await fs.rm(tmp, { force: true })
-  return buf
-}
-
-beforeAll(async () => {
-  const health = await fetch(`${BASE_URL}/api/health`).catch(() => null)
-  if (!health || !health.ok) {
-    throw new Error(`Dev stack not reachable at ${BASE_URL} — run "docker compose up -d" first.`)
-  }
-  exiftool = new ExifTool()
-  baseJpeg = await sharp({ create: { width: 40, height: 30, channels: 3, background: { r: 90, g: 130, b: 170 } } }).jpeg().toBuffer()
-}, 30_000)
-
-afterAll(async () => {
-  await exiftool?.end()
-})
+beforeAll(requireStackReachable, 15_000)
+afterAll(closeExifTool)
 
 describe('automatic section clustering (live stack)', () => {
   it('groups photos into two sections ~5km apart, in chronological order, and stays idempotent on rerun', async () => {
@@ -103,13 +39,10 @@ describe('automatic section clustering (live stack)', () => {
 
     await waitForAllProcessed(cookie, journey.id, 5)
 
-    const clusterRes = await fetch(`${BASE_URL}/api/journeys/${journey.id}/cluster`, { method: 'POST', headers: { cookie } })
-    expect(clusterRes.status).toBe(200)
-    const result = await clusterRes.json()
+    const result = await clusterNow(cookie, journey.id)
     expect(result.sectionsCreated).toBe(2)
 
-    const sectionsRes = await fetch(`${BASE_URL}/api/journeys/${journey.id}/sections`, { headers: { cookie } })
-    const sections = await sectionsRes.json()
+    const sections = await listSections(cookie, journey.id)
     expect(sections).toHaveLength(2)
 
     // Chronological order.
@@ -117,8 +50,7 @@ describe('automatic section clustering (live stack)', () => {
     expect(sections[0].placeName).toBeTruthy()
     expect(sections[1].placeName).toBeTruthy()
 
-    const photosRes = await fetch(`${BASE_URL}/api/journeys/${journey.id}/photos`, { headers: { cookie } })
-    const photos = await photosRes.json()
+    const photos = await listPhotos(cookie, journey.id)
     const bySection = new Map<string, number>()
     for (const p of photos) {
       if (!p.sectionId) continue
@@ -127,11 +59,10 @@ describe('automatic section clustering (live stack)', () => {
     expect([...bySection.values()].sort()).toEqual([2, 3])
 
     // Rerunning clustering with no new data should not create or duplicate sections.
-    const rerun = await fetch(`${BASE_URL}/api/journeys/${journey.id}/cluster`, { method: 'POST', headers: { cookie } })
-    const rerunResult = await rerun.json()
+    const rerunResult = await clusterNow(cookie, journey.id)
     expect(rerunResult.sectionsCreated).toBe(0)
 
-    const sectionsAfterRerun = await (await fetch(`${BASE_URL}/api/journeys/${journey.id}/sections`, { headers: { cookie } })).json()
+    const sectionsAfterRerun = await listSections(cookie, journey.id)
     expect(sectionsAfterRerun).toHaveLength(2)
   }, 40_000)
 
@@ -146,11 +77,11 @@ describe('automatic section clustering (live stack)', () => {
     for (const [i, buf] of photosBuf.entries()) await uploadPhoto(cookie, journey.id, buf, `stelvio-${i}.jpg`)
     await waitForAllProcessed(cookie, journey.id, 2)
 
-    await fetch(`${BASE_URL}/api/journeys/${journey.id}/cluster`, { method: 'POST', headers: { cookie } })
-    const sections = await (await fetch(`${BASE_URL}/api/journeys/${journey.id}/sections`, { headers: { cookie } })).json()
+    await clusterNow(cookie, journey.id)
+    const sections = await listSections(cookie, journey.id)
     expect(sections).toHaveLength(1)
-    const rerun = await fetch(`${BASE_URL}/api/journeys/${journey.id}/cluster`, { method: 'POST', headers: { cookie } })
-    const rerunResult = await rerun.json()
+
+    const rerunResult = await clusterNow(cookie, journey.id)
     expect(rerunResult.sectionsCreated).toBe(0)
     expect(rerunResult.sectionsUpdated).toBe(0)
     expect(rerunResult.photosAssigned).toBe(0)

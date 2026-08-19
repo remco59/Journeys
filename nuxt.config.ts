@@ -33,6 +33,12 @@ export default defineNuxtConfig({
   nitro: {
     experimental: { asyncContext: true }
   },
+  // Precautionary: typed pages' route-matching type is a known source of
+  // "Excessive stack depth" (TS2321) once an app has many dynamic routes
+  // (we already hit that class of issue via $fetch's own typed routes —
+  // see the comment in app/stores/auth.ts). We don't use typed route
+  // params anywhere, so there's no upside to leaving it enabled.
+  experimental: { typedPages: false },
   typescript: {
     strict: true
   }

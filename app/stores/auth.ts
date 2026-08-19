@@ -14,9 +14,13 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     async fetchSession() {
       // Plain $fetch on the server doesn't forward the incoming request's
-      // cookies, so SSR would never see an already-authenticated session.
-      const requestFetch = import.meta.server ? useRequestFetch() : $fetch
-      const response = await requestFetch<{ user: AuthUser | null }>('/api/auth/session')
+      // cookies, so SSR would never see an already-authenticated session —
+      // forward them explicitly instead. (useRequestFetch() would do this
+      // too, but its return type blows TS's recursion limit once the API
+      // surface has this many dynamic routes — Excessive stack depth,
+      // TS2321 — where plain $fetch does not.)
+      const headers = import.meta.server ? useRequestHeaders(['cookie']) : undefined
+      const response = await $fetch<{ user: AuthUser | null }>('/api/auth/session', { headers })
       this.user = response.user
       this.loaded = true
       return this.user

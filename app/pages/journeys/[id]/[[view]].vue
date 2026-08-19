@@ -68,6 +68,41 @@ async function onRecluster() {
     reclustering.value = false
   }
 }
+
+function otherSectionsFor(sectionId: string | null) {
+  return (sections.value ?? []).filter((s) => s.id !== sectionId).map((s) => ({ id: s.id, title: s.title }))
+}
+
+const sectionEditor = ref<{ open: () => void } | null>(null)
+const editingSection = ref<{ id: string; title: string; placeName: string | null; description: string | null } | null>(null)
+
+function openNewSection() {
+  editingSection.value = null
+  sectionEditor.value?.open()
+}
+function openEditSection(section: { id: string; title: string; placeName: string | null; description: string | null }) {
+  editingSection.value = section
+  sectionEditor.value?.open()
+}
+async function onSectionSaved() {
+  await refreshSections()
+}
+
+async function onDeleteSection(sectionId: string) {
+  if (!confirm('Delete this section? Its photos become unsorted, not deleted.')) return
+  await $fetch(`/api/sections/${sectionId}`, { method: 'DELETE' })
+  await Promise.all([refreshPhotos(), refreshSections()])
+}
+
+async function onMergeSection(sourceId: string, intoSectionId: string) {
+  await $fetch(`/api/sections/${sourceId}/merge`, { method: 'POST', body: { intoSectionId } })
+  await Promise.all([refreshPhotos(), refreshSections()])
+}
+
+async function onMovePhoto(photoId: string, sectionId: string) {
+  await $fetch(`/api/photos/${photoId}`, { method: 'PATCH', body: { sectionId } })
+  await refreshPhotos()
+}
 </script>
 
 <template>
@@ -107,13 +142,21 @@ async function onRecluster() {
     <main class="mx-auto max-w-4xl px-6 py-10">
       <div class="mb-6 flex items-start justify-between gap-4">
         <p class="text-sm text-(--color-ink-soft)">Trip, Map and Gallery views land in later phases — this is the Story so far.</p>
-        <button
-          class="shrink-0 rounded-lg border border-(--color-line) px-3 py-1.5 text-sm text-(--color-ink-soft) hover:text-(--color-ink) disabled:opacity-60"
-          :disabled="reclustering"
-          @click="onRecluster"
-        >
-          {{ reclustering ? 'Reclustering…' : 'Recluster now' }}
-        </button>
+        <div class="flex shrink-0 gap-2">
+          <button
+            class="rounded-lg border border-(--color-line) px-3 py-1.5 text-sm text-(--color-ink-soft) hover:text-(--color-ink)"
+            @click="openNewSection"
+          >
+            New section
+          </button>
+          <button
+            class="rounded-lg border border-(--color-line) px-3 py-1.5 text-sm text-(--color-ink-soft) hover:text-(--color-ink) disabled:opacity-60"
+            :disabled="reclustering"
+            @click="onRecluster"
+          >
+            {{ reclustering ? 'Reclustering…' : 'Recluster now' }}
+          </button>
+        </div>
       </div>
 
       <PhotoPhotoUploader :journey-id="id" class="mb-8" @uploaded="onUploaded" />
@@ -124,13 +167,18 @@ async function onRecluster() {
           :key="section.id"
           :section="section"
           :photos="photosBySection.get(section.id) ?? []"
+          :other-sections="otherSectionsFor(section.id)"
+          @edit="openEditSection(section)"
+          @delete="onDeleteSection(section.id)"
+          @merge="(intoId: string) => onMergeSection(section.id, intoId)"
+          @move-photo="onMovePhoto"
         />
 
         <div v-if="unsortedPhotos.length" class="rounded-2xl border border-dashed border-(--color-line) p-5">
           <h3 class="mb-3 font-(family-name:--font-display) text-lg font-medium text-(--color-ink-soft)">
             Unsorted ({{ unsortedPhotos.length }})
           </h3>
-          <PhotoPhotoGrid :photos="unsortedPhotos" />
+          <PhotoPhotoGrid :photos="unsortedPhotos" :other-sections="otherSectionsFor(null)" @move="onMovePhoto" />
         </div>
 
         <p v-if="!sections?.length && !unsortedPhotos.length" class="text-sm text-(--color-ink-soft)">
@@ -138,5 +186,9 @@ async function onRecluster() {
         </p>
       </div>
     </main>
+
+    <ClientOnly>
+      <StorySectionEditorDialog ref="sectionEditor" :journey-id="id" :section="editingSection" @saved="onSectionSaved" />
+    </ClientOnly>
   </div>
 </template>

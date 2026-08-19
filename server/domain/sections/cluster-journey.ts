@@ -5,6 +5,7 @@ import { geoPointSelect } from '../../db/postgis'
 import { buildSectionCandidates, type ClusterPoint } from '../clustering/section-candidates'
 import { reverseGeocode } from '../../geo/geocode'
 import { pickUnlockedFields } from '../provenance/locked-patch'
+import { reindexSectionOrder } from './sections'
 
 async function fetchClusterablePhotos(journeyId: string): Promise<ClusterPoint[]> {
   const db = useDb()
@@ -21,18 +22,6 @@ async function fetchClusterablePhotos(journeyId: string): Promise<ClusterPoint[]
   return rows
     .filter((r) => !r.lockedFields.includes('sectionId') && r.lat != null && r.lon != null && r.capturedAt != null)
     .map((r) => ({ id: r.id, lat: r.lat!, lon: r.lon!, timestamp: r.capturedAt!.getTime() }))
-}
-
-async function reindexSectionOrder(journeyId: string): Promise<void> {
-  const db = useDb()
-  const all = await db
-    .select({ id: sections.id })
-    .from(sections)
-    .where(eq(sections.journeyId, journeyId))
-    .orderBy(sections.arrivalAt)
-  for (let i = 0; i < all.length; i++) {
-    await db.update(sections).set({ orderIndex: i }).where(eq(sections.id, all[i]!.id))
-  }
 }
 
 async function deleteEmptyAutoSections(journeyId: string): Promise<void> {
