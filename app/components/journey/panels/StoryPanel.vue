@@ -106,6 +106,7 @@ async function onLocate(sectionId: string) {
       <StoryStorySectionCard
         v-for="section in sections"
         :key="section.id"
+        :journey-id="journeyId"
         :section="section"
         :photos="photosBySection.get(section.id) ?? []"
         :other-sections="otherSectionsFor(section.id)"

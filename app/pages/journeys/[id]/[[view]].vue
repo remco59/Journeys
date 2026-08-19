@@ -111,7 +111,7 @@ async function refreshAll() {
         :photos="photos ?? []"
         @refresh="refreshAll"
       />
-      <JourneyPanelsGalleryPanel v-else-if="activeView === 'gallery'" :photos="photos ?? []" />
+      <JourneyPanelsGalleryPanel v-else-if="activeView === 'gallery'" :sections="sections ?? []" :photos="photos ?? []" />
     </main>
 
     <JourneyBottomNav :journey-id="id" :active="activeView" />
