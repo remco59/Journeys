@@ -1,0 +1,85 @@
+# Production deployment (Unraid or any other Docker host).
+#
+# Usage:
+#   cp .env.example .env        # then edit — set real passwords, APPDATA_PATH, etc.
+#   docker compose -f compose.prod.yml up -d --build
+#
+# On Unraid, set APPDATA_PATH=/mnt/user/appdata/journeys in .env so the
+# volumes below land under the standard appdata share instead of a local
+# ./data folder. Postgres data, uploaded photos, and .env itself are the
+# only state that needs to survive a redeploy or host migration.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: web
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-journeys}:${POSTGRES_PASSWORD:?set a real password in .env}@postgres:5432/${POSTGRES_DB:-journeys}
+      NODE_ENV: production
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+    volumes:
+      - ${APPDATA_PATH:-./data}/photos:/data/photos
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://127.0.0.1:3000/api/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-journeys}:${POSTGRES_PASSWORD:?set a real password in .env}@postgres:5432/${POSTGRES_DB:-journeys}
+      NODE_ENV: production
+    volumes:
+      - ${APPDATA_PATH:-./data}/photos:/data/photos
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: migrate
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-journeys}:${POSTGRES_PASSWORD:?set a real password in .env}@postgres:5432/${POSTGRES_DB:-journeys}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-journeys}
+      POSTGRES_USER: ${POSTGRES_USER:-journeys}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a real password in .env}
+    volumes:
+      - ${APPDATA_PATH:-./data}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-journeys}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # No ports exposed to the host — only `web` and `worker` need to reach
+    # Postgres, and both do so over the internal compose network. Add a
+    # port mapping here only if you need direct host access (e.g. backups).

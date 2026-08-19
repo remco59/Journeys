@@ -16,6 +16,16 @@ ENV HOST=0.0.0.0
 EXPOSE 3000
 CMD ["npm", "run", "dev"]
 
+# ---- migrate: schema migration only — no app build needed, so it's cheap
+# to run before web/worker start regardless of which target the compose
+# file is deploying ----
+FROM base AS migrate
+COPY package.json package-lock.json* ./
+RUN npm install
+COPY drizzle.config.ts ./
+COPY server/db ./server/db
+CMD ["npm", "run", "db:migrate"]
+
 # ---- deps: production node_modules only ----
 FROM base AS deps
 COPY package.json package-lock.json* ./
