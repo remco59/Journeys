@@ -4,18 +4,23 @@ import { useMapSyncStore } from '../../../stores/mapSync'
 
 type Section = { id: string; title: string; placeName: string | null; lat: number | null; lon: number | null }
 type TraceGeom = { type: 'LineString'; coordinates: [number, number][] } | null
+type TransportMode = 'walking' | 'cycling' | 'car' | 'train' | 'bus' | 'ferry' | 'flight' | 'unknown'
 type Trace = {
   id: string
   type: 'travel' | 'activity' | 'unknown'
   confidence: 'high' | 'medium' | 'low' | 'inferred'
+  transportMode: TransportMode
+  transportModeReason: string | null
   geom: TraceGeom
 }
 type Photo = { id: string; sectionId: string | null; storageKeyThumb: string | null; capturedAt: string | null }
 
 const props = defineProps<{ sections: Section[]; traces: Trace[]; photos: Photo[] }>()
+const emit = defineEmits<{ editTrace: [traceId: string, transportMode: TransportMode] }>()
 
 const GOLD = '#b8862f'
 const PINE = '#2f6b52'
+const TRANSPORT_MODES: TransportMode[] = ['walking', 'cycling', 'car', 'train', 'bus', 'ferry', 'flight', 'unknown']
 
 const mapSync = useMapSyncStore()
 const containerEl = ref<HTMLElement | null>(null)
@@ -41,6 +46,30 @@ function traceStyle(trace: Trace): L.PolylineOptions {
   return { color: GOLD, weight: 3, opacity: 0.85 }
 }
 
+function buildTracePopup(trace: Trace): HTMLElement {
+  const container = document.createElement('div')
+  container.style.cssText = 'font-family:system-ui,sans-serif;font-size:13px;min-width:170px'
+
+  const reason = document.createElement('div')
+  reason.style.cssText = 'margin-bottom:6px;color:#666;font-size:12px'
+  reason.textContent = trace.transportModeReason ?? 'No inference reason recorded'
+  container.appendChild(reason)
+
+  const select = document.createElement('select')
+  select.style.cssText = 'width:100%;padding:2px 4px'
+  for (const mode of TRANSPORT_MODES) {
+    const option = document.createElement('option')
+    option.value = mode
+    option.textContent = mode
+    if (mode === trace.transportMode) option.selected = true
+    select.appendChild(option)
+  }
+  select.addEventListener('change', () => emit('editTrace', trace.id, select.value as TransportMode))
+  container.appendChild(select)
+
+  return container
+}
+
 function render() {
   if (!map.value) return
 
@@ -55,7 +84,8 @@ function render() {
   for (const trace of props.traces) {
     if (!trace.geom) continue
     const latlngs = trace.geom.coordinates.map(([lon, lat]) => [lat, lon] as L.LatLngExpression)
-    L.polyline(latlngs, traceStyle(trace)).addTo(traceLayer)
+    const line = L.polyline(latlngs, traceStyle(trace)).addTo(traceLayer)
+    line.bindPopup(buildTracePopup(trace))
     boundsPoints.push(...latlngs)
   }
 

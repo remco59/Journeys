@@ -6,6 +6,7 @@ import { reconstructTravelTrace, type GapPoint } from './reconstruct'
 import { findTraceBetween, deleteOrphanedTraces } from './traces'
 import { pickUnlockedFields } from '../provenance/locked-patch'
 import { mapTransportHint } from './transport-hints'
+import { inferTransportFromSpeed } from './transport-inference'
 import type { LatLon } from '../clustering/geo-math'
 
 // Allows a little slack between when photos were taken and when the GPS
@@ -152,6 +153,7 @@ export async function reconstructJourneyTraces(journeyId: string): Promise<Recon
         type: 'activity',
         activityId: coveringActivity.id,
         transportMode: activityTypeToTransportMode(coveringActivity.type),
+        transportModeReason: `Recorded via a ${coveringActivity.type} activity import`,
         geom: geoJsonToLatLon(coveringActivity.geomGeoJson),
         confidence: 'high',
         startedAt: coveringActivity.startedAt,
@@ -171,10 +173,24 @@ export async function reconstructJourneyTraces(journeyId: string): Promise<Recon
         { lat: to.lat, lon: to.lon, arrivalAt: gapEnd },
         [...gapPhotos, ...gapTimelinePoints]
       )
+
+      // Timeline's own hint outranks a bare speed guess; fall back to the
+      // rule-based estimate only when nothing else resolved a mode, and
+      // only for the "travel" branch — an unknown/curved gap has no real
+      // speed to estimate from (see reconstruct.ts).
+      let transportMode = mapTransportHint(draft.transportModeHint)
+      let transportModeReason: string | null = draft.transportModeHint ? `From Google Timeline (${draft.transportModeHint})` : null
+      if (transportMode === 'unknown' && draft.type === 'travel') {
+        const inferred = inferTransportFromSpeed(draft.distanceM, draft.durationS)
+        transportMode = inferred.mode
+        transportModeReason = inferred.reason
+      }
+
       proposed = {
         type: draft.type,
         activityId: null,
-        transportMode: mapTransportHint(draft.transportModeHint),
+        transportMode,
+        transportModeReason,
         geom: draft.geom,
         confidence: draft.confidence,
         startedAt: from.departureAt,
@@ -193,6 +209,7 @@ export async function reconstructJourneyTraces(journeyId: string): Promise<Recon
       const changed =
         existing.type !== proposed.type ||
         existing.transportMode !== proposed.transportMode ||
+        existing.transportModeReason !== (proposed.transportModeReason ?? null) ||
         existing.confidence !== proposed.confidence ||
         existing.activityId !== (proposed.activityId ?? null) ||
         existing.startedAt?.getTime() !== proposed.startedAt?.getTime() ||

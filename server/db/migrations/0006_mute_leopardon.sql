@@ -1,0 +1,1 @@
+ALTER TABLE "traces" ADD COLUMN "transport_mode_reason" text;

@@ -64,6 +64,11 @@ const photosBySection = computed(() => {
 async function refreshAll() {
   await Promise.all([refreshPhotos(), refreshSections(), refreshTraces(), refreshActivities()])
 }
+
+async function onEditTrace(traceId: string, transportMode: string) {
+  await $fetch(`/api/traces/${traceId}`, { method: 'PATCH', body: { transportMode } })
+  await refreshTraces()
+}
 </script>
 
 <template>
@@ -103,7 +108,7 @@ async function refreshAll() {
     <main>
       <JourneyPanelsTripPanel v-if="activeView === 'trip'" :journey-id="id" :sections="sections ?? []" :photos-by-section="photosBySection" />
       <ClientOnly v-else-if="activeView === 'map'">
-        <JourneyPanelsMapPanel :sections="sections ?? []" :traces="traces ?? []" :photos="photos ?? []" />
+        <JourneyPanelsMapPanel :sections="sections ?? []" :traces="traces ?? []" :photos="photos ?? []" @edit-trace="onEditTrace" />
       </ClientOnly>
       <JourneyPanelsStoryPanel
         v-else-if="activeView === 'story'"

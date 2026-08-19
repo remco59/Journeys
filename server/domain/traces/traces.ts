@@ -20,6 +20,7 @@ export async function listTracesForJourney(journeyId: string) {
       toSectionId: traces.toSectionId,
       type: traces.type,
       transportMode: traces.transportMode,
+      transportModeReason: traces.transportModeReason,
       confidence: traces.confidence,
       source: traces.source,
       lockedFields: traces.lockedFields,
@@ -50,6 +51,38 @@ export async function findTraceBetween(journeyId: string, fromSectionId: string,
     .where(and(eq(traces.journeyId, journeyId), eq(traces.fromSectionId, fromSectionId), eq(traces.toSectionId, toSectionId)))
     .limit(1)
   return rows[0] ?? null
+}
+
+export async function getTraceForOwner(traceId: string, ownerId: string) {
+  const db = useDb()
+  const rows = await db
+    .select({ trace: traces })
+    .from(traces)
+    .innerJoin(journeys, eq(traces.journeyId, journeys.id))
+    .where(and(eq(traces.id, traceId), eq(journeys.ownerId, ownerId)))
+    .limit(1)
+  return rows[0]?.trace ?? null
+}
+
+/** A manual transport-mode edit locks the field and replaces the reason — it's no longer an estimate. */
+export async function updateTraceTransportMode(trace: typeof traces.$inferSelect, transportMode: (typeof traces.$inferInsert)['transportMode']) {
+  const db = useDb()
+  const locks = new Set(trace.lockedFields)
+  locks.add('transportMode')
+  locks.add('transportModeReason')
+
+  const [updated] = await db
+    .update(traces)
+    .set({
+      transportMode,
+      transportModeReason: 'Set manually',
+      source: 'user_override',
+      lockedFields: [...locks],
+      updatedAt: new Date()
+    })
+    .where(eq(traces.id, trace.id))
+    .returning()
+  return updated!
 }
 
 /** Traces whose endpoint sections no longer exist as an adjacent pair — cleaned up after reconstruction. */

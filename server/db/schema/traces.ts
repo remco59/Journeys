@@ -28,6 +28,8 @@ export const traces = pgTable(
     activityId: uuid('activity_id').references(() => activities.id, { onDelete: 'cascade' }),
     type: traceTypeEnum('type').notNull().default('unknown'),
     transportMode: transportModeEnum('transport_mode').notNull().default('unknown'),
+    /** Human-readable explanation of how transportMode was decided — never presented as certainty when it isn't (§11/§12). */
+    transportModeReason: text('transport_mode_reason'),
     geom: geometryLineString('geom'),
     confidence: confidenceEnum('confidence').notNull().default('inferred'),
     source: provenanceEnum('source').notNull().default('auto'),
