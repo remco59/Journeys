@@ -17,6 +17,14 @@ export async function completeImport(importId: string, stats?: Record<string, un
   await db.update(imports).set({ status: 'completed', completedAt: new Date(), stats }).where(eq(imports.id, importId))
 }
 
+export async function failImport(importId: string, errorMessage: string) {
+  const db = useDb()
+  await db
+    .update(imports)
+    .set({ status: 'failed', completedAt: new Date(), stats: { error: errorMessage } })
+    .where(eq(imports.id, importId))
+}
+
 export async function findExistingImportFileByChecksum(journeyId: string, checksum: string) {
   const db = useDb()
   const rows = await db

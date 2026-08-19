@@ -1,6 +1,6 @@
 import { haversineMeters, type LatLon } from '../clustering/geo-math'
 
-export type GapPoint = LatLon & { timestamp: number }
+export type GapPoint = LatLon & { timestamp: number; source?: 'photo' | 'timeline'; transportModeHint?: string | null }
 
 export type TraceDraft = {
   type: 'travel' | 'unknown'
@@ -8,6 +8,7 @@ export type TraceDraft = {
   confidence: 'high' | 'medium' | 'low' | 'inferred'
   distanceM: number
   durationS: number
+  transportModeHint: string | null
 }
 
 const MAX_GAP_MINUTES_PER_POINT = 10
@@ -52,10 +53,12 @@ function pathDistanceMeters(points: LatLon[]): number {
 
 /**
  * Reconstructs the trace between two chronologically adjacent sections from
- * whatever photo points fall in the gap between them. Limited to the
- * "reconstructed short route" and "unknown gap" branches of §10's state
- * machine — the Timeline-movement and activity-track branches are added in
- * later phases, once those sources exist.
+ * whatever points fall in the gap between them — photo GPS and, once
+ * imported, Google Timeline observations (§10's "reconstructed short
+ * route" and "unknown gap" branches; activity tracks are handled upstream
+ * in reconstruct-journey.ts). Timeline points are deliberate, continuous
+ * GPS recording rather than incidental photo locations, so a dense gap
+ * with any Timeline support earns high confidence instead of medium.
  */
 export function reconstructTravelTrace(
   from: LatLon & { departureAt: number },
@@ -73,12 +76,14 @@ export function reconstructTravelTrace(
 
   if (denseEnough) {
     const geom: LatLon[] = [{ lat: from.lat, lon: from.lon }, ...sorted.map((p) => ({ lat: p.lat, lon: p.lon })), { lat: to.lat, lon: to.lon }]
+    const hasTimelineSupport = sorted.some((p) => p.source === 'timeline')
     return {
       type: 'travel',
       geom,
-      confidence: 'medium',
+      confidence: hasTimelineSupport ? 'high' : 'medium',
       distanceM: pathDistanceMeters(geom),
-      durationS
+      durationS,
+      transportModeHint: dominantTransportHint(sorted)
     }
   }
 
@@ -88,6 +93,18 @@ export function reconstructTravelTrace(
     geom,
     confidence: 'inferred',
     distanceM: haversineMeters(from, to),
-    durationS
+    durationS,
+    transportModeHint: null
   }
+}
+
+/** The most common non-null transport hint among the gap's Timeline-sourced points, if any agree. */
+function dominantTransportHint(points: GapPoint[]): string | null {
+  const counts = new Map<string, number>()
+  for (const p of points) {
+    if (!p.transportModeHint) continue
+    counts.set(p.transportModeHint, (counts.get(p.transportModeHint) ?? 0) + 1)
+  }
+  if (counts.size === 0) return null
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]![0]
 }

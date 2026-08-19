@@ -66,4 +66,37 @@ describe('reconstructTravelTrace', () => {
     expect(denseTrace.distanceM).toBeGreaterThan(0)
     expect(sparseTrace.distanceM).toBeGreaterThan(0)
   })
+
+  it('upgrades confidence to "high" when any dense gap point is Timeline-sourced, vs "medium" for photo-only', () => {
+    const from = { ...MILAN, departureAt: 0 }
+    const to = { ...COMO, arrivalAt: 40 * MIN }
+    const points = [
+      { lat: 45.55, lon: 9.15, timestamp: 10 * MIN },
+      { lat: 45.65, lon: 9.13, timestamp: 20 * MIN },
+      { lat: 45.72, lon: 9.1, timestamp: 30 * MIN }
+    ]
+    const photoOnly: GapPoint[] = points.map((p) => ({ ...p, source: 'photo' }))
+    const withTimeline: GapPoint[] = points.map((p) => ({ ...p, source: 'timeline' }))
+
+    expect(reconstructTravelTrace(from, to, photoOnly).confidence).toBe('medium')
+    expect(reconstructTravelTrace(from, to, withTimeline).confidence).toBe('high')
+  })
+
+  it('carries the most common transport-mode hint from Timeline points onto the trace draft', () => {
+    const from = { ...MILAN, departureAt: 0 }
+    const to = { ...COMO, arrivalAt: 40 * MIN }
+    const points: GapPoint[] = [
+      { lat: 45.55, lon: 9.15, timestamp: 10 * MIN, source: 'timeline', transportModeHint: 'IN_TRAIN' },
+      { lat: 45.65, lon: 9.13, timestamp: 20 * MIN, source: 'timeline', transportModeHint: 'IN_TRAIN' },
+      { lat: 45.72, lon: 9.1, timestamp: 30 * MIN, source: 'timeline', transportModeHint: 'WALKING' }
+    ]
+    expect(reconstructTravelTrace(from, to, points).transportModeHint).toBe('IN_TRAIN')
+  })
+
+  it('has no transport hint for the unknown branch, even if a lone point happened to carry one', () => {
+    const from = { ...MILAN, departureAt: 0 }
+    const to = { lat: 52.3105, lon: 4.7683, arrivalAt: 2 * HOUR }
+    const trace = reconstructTravelTrace(from, to, [{ lat: 48, lon: 6, timestamp: HOUR, source: 'timeline', transportModeHint: 'FLYING' }])
+    expect(trace.transportModeHint).toBeNull()
+  })
 })

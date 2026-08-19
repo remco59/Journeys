@@ -78,6 +78,13 @@ export async function listActivities(cookie: string, journeyId: string) {
   return res.json()
 }
 
+export async function uploadTimeline(cookie: string, journeyId: string, doc: unknown, filename = 'timeline.json') {
+  const form = new FormData()
+  form.append('file', new Blob([JSON.stringify(doc)], { type: 'application/json' }), filename)
+  const res = await fetch(`${BASE_URL}/api/journeys/${journeyId}/timeline`, { method: 'POST', headers: { cookie }, body: form })
+  return { status: res.status, body: await res.json() }
+}
+
 export async function uploadActivity(cookie: string, journeyId: string, buffer: Buffer, filename: string) {
   const form = new FormData()
   form.append('file', new Blob([buffer], { type: 'application/gpx+xml' }), filename)

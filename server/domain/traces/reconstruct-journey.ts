@@ -1,10 +1,11 @@
-import { eq, and, gt, lt, ne, or, isNull, isNotNull } from 'drizzle-orm'
+import { eq, and, gt, lt, ne, or, inArray, isNull, isNotNull } from 'drizzle-orm'
 import { useDb } from '../../db/client'
-import { sections, photos, traces, activities } from '../../db/schema'
+import { sections, photos, traces, activities, observations } from '../../db/schema'
 import { geoPointSelect, lineStringGeoJsonSelect } from '../../db/postgis'
 import { reconstructTravelTrace, type GapPoint } from './reconstruct'
 import { findTraceBetween, deleteOrphanedTraces } from './traces'
 import { pickUnlockedFields } from '../provenance/locked-patch'
+import { mapTransportHint } from './transport-hints'
 import type { LatLon } from '../clustering/geo-math'
 
 // Allows a little slack between when photos were taken and when the GPS
@@ -55,7 +56,33 @@ async function fetchGapPhotos(journeyId: string, fromSectionId: string, toSectio
 
   return rows
     .filter((r) => r.lat != null && r.lon != null && r.capturedAt != null)
-    .map((r) => ({ lat: r.lat!, lon: r.lon!, timestamp: r.capturedAt!.getTime() }))
+    .map((r) => ({ lat: r.lat!, lon: r.lon!, timestamp: r.capturedAt!.getTime(), source: 'photo' as const }))
+}
+
+async function fetchGapTimelinePoints(journeyId: string, afterMs: number, beforeMs: number): Promise<GapPoint[]> {
+  const db = useDb()
+  const rows = await db
+    .select({ capturedAt: observations.capturedAt, rawData: observations.rawData, ...geoPointSelect(observations.geom) })
+    .from(observations)
+    .where(
+      and(
+        eq(observations.journeyId, journeyId),
+        inArray(observations.sourceType, ['timeline_point', 'timeline_movement']),
+        isNotNull(observations.geom),
+        gt(observations.capturedAt, new Date(afterMs)),
+        lt(observations.capturedAt, new Date(beforeMs))
+      )
+    )
+
+  return rows
+    .filter((r) => r.lat != null && r.lon != null)
+    .map((r) => ({
+      lat: r.lat!,
+      lon: r.lon!,
+      timestamp: r.capturedAt.getTime(),
+      source: 'timeline' as const,
+      transportModeHint: (r.rawData as { transportModeHint?: string } | null)?.transportModeHint ?? null
+    }))
 }
 
 async function findCoveringActivity(journeyId: string, afterMs: number, beforeMs: number) {
@@ -96,10 +123,13 @@ export type ReconstructJourneyResult = { tracesCreated: number; tracesUpdated: n
  * Recomputes the trace between every chronologically adjacent pair of
  * sections. Checks for a covering GPX/TCX/FIT activity first (the
  * "observed route" branch of §10 — high confidence, the activity's own
- * track); falls back to the photo-point and unknown-gap branches otherwise.
- * The Timeline-movement branch arrives in Phase 10. Safe to call
- * repeatedly: an existing trace's locked fields are preserved exactly like
- * section/photo reprocessing (§12).
+ * track); otherwise reconstructs from whatever points fall in the gap,
+ * merging photo GPS with any imported Google Timeline observations (which,
+ * being deliberate continuous recording rather than incidental photo
+ * locations, can push a dense gap's confidence to "high" and contribute a
+ * transport-mode hint — see reconstruct.ts). Safe to call repeatedly: an
+ * existing trace's locked fields are preserved exactly like section/photo
+ * reprocessing (§12).
  */
 export async function reconstructJourneyTraces(journeyId: string): Promise<ReconstructJourneyResult> {
   const db = useDb()
@@ -130,16 +160,21 @@ export async function reconstructJourneyTraces(journeyId: string): Promise<Recon
         durationS: Math.round((coveringActivity.endedAt.getTime() - coveringActivity.startedAt.getTime()) / 1000)
       }
     } else {
-      const gapPoints = await fetchGapPhotos(journeyId, from.id, to.id, from.departureAt.getTime(), to.arrivalAt.getTime())
+      const gapStart = from.departureAt.getTime()
+      const gapEnd = to.arrivalAt.getTime()
+      const [gapPhotos, gapTimelinePoints] = await Promise.all([
+        fetchGapPhotos(journeyId, from.id, to.id, gapStart, gapEnd),
+        fetchGapTimelinePoints(journeyId, gapStart, gapEnd)
+      ])
       const draft = reconstructTravelTrace(
-        { lat: from.lat, lon: from.lon, departureAt: from.departureAt.getTime() },
-        { lat: to.lat, lon: to.lon, arrivalAt: to.arrivalAt.getTime() },
-        gapPoints
+        { lat: from.lat, lon: from.lon, departureAt: gapStart },
+        { lat: to.lat, lon: to.lon, arrivalAt: gapEnd },
+        [...gapPhotos, ...gapTimelinePoints]
       )
       proposed = {
         type: draft.type,
         activityId: null,
-        transportMode: 'unknown',
+        transportMode: mapTransportHint(draft.transportModeHint),
         geom: draft.geom,
         confidence: draft.confidence,
         startedAt: from.departureAt,

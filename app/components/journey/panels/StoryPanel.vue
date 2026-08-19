@@ -129,9 +129,10 @@ async function onLocateActivity() {
       </div>
     </div>
 
-    <div class="mb-8 grid gap-3 sm:grid-cols-2">
+    <div class="mb-8 grid gap-3 sm:grid-cols-3">
       <PhotoPhotoUploader :journey-id="journeyId" @uploaded="emit('refresh')" />
       <ActivityActivityUploader :journey-id="journeyId" @uploaded="emit('refresh')" />
+      <TimelineTimelineUploader :journey-id="journeyId" @uploaded="emit('refresh')" />
     </div>
 
     <div class="space-y-5">
