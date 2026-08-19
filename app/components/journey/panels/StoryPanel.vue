@@ -133,14 +133,14 @@ async function onLocateActivity() {
     </div>
 
     <div v-if="!readonly" class="mb-8 grid gap-3 sm:grid-cols-3">
-      <PhotoPhotoUploader :journey-id="journeyId" @uploaded="emit('refresh')" />
-      <ActivityActivityUploader :journey-id="journeyId" @uploaded="emit('refresh')" />
-      <TimelineTimelineUploader :journey-id="journeyId" @uploaded="emit('refresh')" />
+      <PhotoUploader :journey-id="journeyId" @uploaded="emit('refresh')" />
+      <ActivityUploader :journey-id="journeyId" @uploaded="emit('refresh')" />
+      <TimelineUploader :journey-id="journeyId" @uploaded="emit('refresh')" />
     </div>
 
     <div class="space-y-5">
       <template v-for="item in storyItems" :key="item.kind + (item.kind === 'section' ? item.section.id : item.activity.id)">
-        <StoryStorySectionCard
+        <StorySectionCard
           v-if="item.kind === 'section'"
           :section="item.section"
           :photos="photosBySection.get(item.section.id) ?? []"
@@ -158,7 +158,7 @@ async function onLocateActivity() {
         <h3 class="mb-3 font-(family-name:--font-display) text-lg font-medium text-(--color-ink-soft)">
           Unsorted ({{ unsortedPhotos.length }})
         </h3>
-        <PhotoPhotoGrid :photos="unsortedPhotos" :other-sections="otherSectionsFor(null)" @move="onMovePhoto" />
+        <PhotoGrid :photos="unsortedPhotos" :other-sections="otherSectionsFor(null)" @move="onMovePhoto" />
       </div>
 
       <p v-if="!storyItems.length && !unsortedPhotos.length" class="text-sm text-(--color-ink-soft)">

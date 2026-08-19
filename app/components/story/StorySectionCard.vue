@@ -62,9 +62,9 @@ const managingPhotos = ref(false)
       </span>
     </div>
 
-    <StoryStoryPhotoPreview :section-id="section.id" :photos="photos" />
+    <StoryPhotoPreview :section-id="section.id" :photos="photos" />
 
-    <PhotoPhotoGrid
+    <PhotoGrid
       v-if="managingPhotos && !readonly"
       :photos="photos"
       :other-sections="otherSections"
