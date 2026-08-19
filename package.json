@@ -1,0 +1,41 @@
+{
+  "name": "journeys",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "worker:dev": "tsx watch server/jobs/worker.ts",
+    "worker": "node .output/worker/index.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx server/db/migrate.ts",
+    "typecheck": "nuxt typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "nuxt": "^4.5.2",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0",
+    "drizzle-orm": "^0.45.2",
+    "pg": "^8.23.0",
+    "zod": "^3.24.1",
+    "@node-rs/argon2": "^2.0.2",
+    "nanoid": "^5.0.9",
+    "luxon": "^3.5.0",
+    "graphile-worker": "^0.16.6",
+    "pinia": "^2.3.0",
+    "@pinia/nuxt": "^0.9.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.19.2",
+    "vitest": "^2.1.8",
+    "@types/pg": "^8.11.10",
+    "@types/luxon": "^3.4.2",
+    "@vue/test-utils": "^2.4.6"
+  }
+}

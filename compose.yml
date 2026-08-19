@@ -1,0 +1,64 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: dev
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-journeys}:${POSTGRES_PASSWORD:-journeys_dev_password}@postgres:5432/${POSTGRES_DB:-journeys}
+    ports:
+      - '3000:3000'
+    volumes:
+      - photos-original:/data/photos
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    develop:
+      watch:
+        - action: sync
+          path: ./app
+          target: /app/app
+        - action: sync
+          path: ./server
+          target: /app/server
+        - action: sync
+          path: ./shared
+          target: /app/shared
+        - action: rebuild
+          path: package.json
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: dev
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-journeys}:${POSTGRES_PASSWORD:-journeys_dev_password}@postgres:5432/${POSTGRES_DB:-journeys}
+    command: ['npm', 'run', 'db:migrate']
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-journeys}
+      POSTGRES_USER: ${POSTGRES_USER:-journeys}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-journeys_dev_password}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - '5433:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-journeys}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
+  photos-original:
