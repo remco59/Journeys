@@ -17,6 +17,7 @@ const emit = defineEmits<{
   delete: []
   merge: [intoSectionId: string]
   movePhoto: [photoId: string, sectionId: string]
+  locate: []
 }>()
 
 const CONFIDENCE_LABEL: Record<string, string> = {
@@ -40,7 +41,13 @@ function onMergeChange() {
     <div class="mb-3 flex items-start justify-between gap-3">
       <div>
         <h3 class="font-(family-name:--font-display) text-xl font-medium">{{ section.title }}</h3>
-        <p v-if="section.placeName" class="mt-0.5 text-sm text-(--color-ink-soft)">📍 {{ section.placeName }}</p>
+        <button
+          v-if="section.placeName"
+          class="mt-0.5 block text-sm text-(--color-ink-soft) hover:text-(--color-gold) hover:underline"
+          @click="emit('locate')"
+        >
+          📍 {{ section.placeName }}
+        </button>
         <p v-if="section.arrivalAt" class="mt-0.5 text-sm text-(--color-ink-soft)">
           {{ new Date(section.arrivalAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long' }) }} ·
           {{ photos.length }} photo{{ photos.length === 1 ? '' : 's' }}

@@ -6,6 +6,7 @@ import { buildSectionCandidates, type ClusterPoint } from '../clustering/section
 import { reverseGeocode } from '../../geo/geocode'
 import { pickUnlockedFields } from '../provenance/locked-patch'
 import { reindexSectionOrder } from './sections'
+import { reconstructJourneyTraces } from '../traces/reconstruct-journey'
 
 async function fetchClusterablePhotos(journeyId: string): Promise<ClusterPoint[]> {
   const db = useDb()
@@ -44,6 +45,8 @@ export type ClusterJourneyResult = {
   sectionsCreated: number
   sectionsUpdated: number
   photosAssigned: number
+  tracesCreated: number
+  tracesUpdated: number
 }
 
 /**
@@ -158,5 +161,8 @@ export async function clusterJourney(journeyId: string): Promise<ClusterJourneyR
   await reindexSectionOrder(journeyId)
   await deleteEmptyAutoSections(journeyId)
 
-  return { sectionsCreated, sectionsUpdated, photosAssigned }
+  // Sections must settle before the traces between them mean anything.
+  const traceResult = await reconstructJourneyTraces(journeyId)
+
+  return { sectionsCreated, sectionsUpdated, photosAssigned, ...traceResult }
 }
