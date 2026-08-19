@@ -13,6 +13,15 @@ const props = defineProps<{
     }
   >
   photos: Array<{ id: string; sectionId: string | null; storageKeyThumb: string | null; capturedAt: string | null; locationSource: string }>
+  activities: Array<{
+    id: string
+    title: string
+    type: 'cycling' | 'hiking' | 'running' | 'walking' | 'swimming' | 'other'
+    startedAt: string
+    endedAt: string
+    distanceM: number | null
+    elevationGainM: number | null
+  }>
 }>()
 
 const emit = defineEmits<{ refresh: [] }>()
@@ -29,6 +38,22 @@ const photosBySection = computed(() => {
   return map
 })
 const unsortedPhotos = computed(() => photosBySection.value.get(null) ?? [])
+
+// Sections and activities interleaved chronologically, per the brief:
+// section -> movement/activity -> section -> activity -> section...
+type StoryItem =
+  | { kind: 'section'; time: number; section: (typeof props.sections)[number] }
+  | { kind: 'activity'; time: number; activity: (typeof props.activities)[number] }
+
+const storyItems = computed<StoryItem[]>(() => {
+  const items: StoryItem[] = [
+    ...props.sections
+      .filter((s) => s.arrivalAt)
+      .map((section) => ({ kind: 'section' as const, time: new Date(section.arrivalAt!).getTime(), section })),
+    ...props.activities.map((activity) => ({ kind: 'activity' as const, time: new Date(activity.startedAt).getTime(), activity }))
+  ]
+  return items.sort((a, b) => a.time - b.time)
+})
 
 function otherSectionsFor(sectionId: string | null) {
   return props.sections.filter((s) => s.id !== sectionId).map((s) => ({ id: s.id, title: s.title }))
@@ -77,6 +102,10 @@ async function onLocate(sectionId: string) {
   mapSync.select(sectionId)
   await navigateTo(`/journeys/${props.journeyId}/map`)
 }
+
+async function onLocateActivity() {
+  await navigateTo(`/journeys/${props.journeyId}/map`)
+}
 </script>
 
 <template>
@@ -100,22 +129,27 @@ async function onLocate(sectionId: string) {
       </div>
     </div>
 
-    <PhotoPhotoUploader :journey-id="journeyId" class="mb-8" @uploaded="emit('refresh')" />
+    <div class="mb-8 grid gap-3 sm:grid-cols-2">
+      <PhotoPhotoUploader :journey-id="journeyId" @uploaded="emit('refresh')" />
+      <ActivityActivityUploader :journey-id="journeyId" @uploaded="emit('refresh')" />
+    </div>
 
     <div class="space-y-5">
-      <StoryStorySectionCard
-        v-for="section in sections"
-        :key="section.id"
-        :journey-id="journeyId"
-        :section="section"
-        :photos="photosBySection.get(section.id) ?? []"
-        :other-sections="otherSectionsFor(section.id)"
-        @edit="openEditSection(section)"
-        @delete="onDeleteSection(section.id)"
-        @merge="(intoId: string) => onMergeSection(section.id, intoId)"
-        @move-photo="onMovePhoto"
-        @locate="onLocate(section.id)"
-      />
+      <template v-for="item in storyItems" :key="item.kind + (item.kind === 'section' ? item.section.id : item.activity.id)">
+        <StoryStorySectionCard
+          v-if="item.kind === 'section'"
+          :journey-id="journeyId"
+          :section="item.section"
+          :photos="photosBySection.get(item.section.id) ?? []"
+          :other-sections="otherSectionsFor(item.section.id)"
+          @edit="openEditSection(item.section)"
+          @delete="onDeleteSection(item.section.id)"
+          @merge="(intoId: string) => onMergeSection(item.section.id, intoId)"
+          @move-photo="onMovePhoto"
+          @locate="onLocate(item.section.id)"
+        />
+        <StoryActivityCard v-else :activity="item.activity" @locate="onLocateActivity" />
+      </template>
 
       <div v-if="unsortedPhotos.length" class="rounded-2xl border border-dashed border-(--color-line) p-5">
         <h3 class="mb-3 font-(family-name:--font-display) text-lg font-medium text-(--color-ink-soft)">
@@ -124,8 +158,8 @@ async function onLocate(sectionId: string) {
         <PhotoPhotoGrid :photos="unsortedPhotos" :other-sections="otherSectionsFor(null)" @move="onMovePhoto" />
       </div>
 
-      <p v-if="!sections.length && !unsortedPhotos.length" class="text-sm text-(--color-ink-soft)">
-        No photos yet — upload some to see the Story build itself.
+      <p v-if="!storyItems.length && !unsortedPhotos.length" class="text-sm text-(--color-ink-soft)">
+        Nothing yet — upload photos or import a GPX track to see the Story build itself.
       </p>
     </div>
 

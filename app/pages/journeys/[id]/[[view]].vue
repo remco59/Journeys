@@ -49,6 +49,7 @@ const durationDays = computed(() => {
 const { data: photos, refresh: refreshPhotos } = await useFetch(`/api/journeys/${id}/photos`)
 const { data: sections, refresh: refreshSections } = await useFetch(`/api/journeys/${id}/sections`)
 const { data: traces, refresh: refreshTraces } = await useFetch(`/api/journeys/${id}/traces`)
+const { data: activities, refresh: refreshActivities } = await useFetch(`/api/journeys/${id}/activities`)
 
 const photosBySection = computed(() => {
   const map = new Map<string | null, NonNullable<typeof photos.value>>()
@@ -61,7 +62,7 @@ const photosBySection = computed(() => {
 })
 
 async function refreshAll() {
-  await Promise.all([refreshPhotos(), refreshSections(), refreshTraces()])
+  await Promise.all([refreshPhotos(), refreshSections(), refreshTraces(), refreshActivities()])
 }
 </script>
 
@@ -109,6 +110,7 @@ async function refreshAll() {
         :journey-id="id"
         :sections="sections ?? []"
         :photos="photos ?? []"
+        :activities="activities ?? []"
         @refresh="refreshAll"
       />
       <JourneyPanelsGalleryPanel v-else-if="activeView === 'gallery'" :sections="sections ?? []" :photos="photos ?? []" />

@@ -36,6 +36,13 @@
       "when": 1787144336141,
       "tag": "0004_slippery_zodiak",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787145197553,
+      "tag": "0005_careless_lake",
+      "breakpoints": true
     }
   ]
 }

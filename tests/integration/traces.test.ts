@@ -116,8 +116,12 @@ describe('trace reconstruction (live stack)', () => {
 
     // No manual override endpoint exists yet (that's Phase 11) — this test
     // documents today's behavior: reclustering with no new data leaves the
-    // single trace stable rather than duplicating or dropping it.
-    await clusterNow(cookie, journey.id)
+    // single trace stable rather than duplicating, dropping, or spuriously
+    // "updating" it.
+    const rerun = await clusterNow(cookie, journey.id)
+    expect(rerun.tracesCreated).toBe(0)
+    expect(rerun.tracesUpdated).toBe(0)
+
     const tracesAfter = await listTraces(cookie, journey.id)
     expect(tracesAfter).toHaveLength(1)
     expect(tracesAfter[0].id).toBe(traces[0].id)

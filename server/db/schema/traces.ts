@@ -1,6 +1,7 @@
 import { pgTable, pgEnum, uuid, real, integer, timestamp, text, index } from 'drizzle-orm/pg-core'
 import { journeys } from './journeys'
 import { sections } from './sections'
+import { activities } from './activities'
 import { confidenceEnum, provenanceEnum } from './enums'
 import { geometryLineString } from '../postgis'
 
@@ -24,7 +25,7 @@ export const traces = pgTable(
     journeyId: uuid('journey_id').notNull().references(() => journeys.id, { onDelete: 'cascade' }),
     fromSectionId: uuid('from_section_id').references(() => sections.id, { onDelete: 'cascade' }),
     toSectionId: uuid('to_section_id').references(() => sections.id, { onDelete: 'cascade' }),
-    // activityId added in Phase 8, once the activities table exists.
+    activityId: uuid('activity_id').references(() => activities.id, { onDelete: 'cascade' }),
     type: traceTypeEnum('type').notNull().default('unknown'),
     transportMode: transportModeEnum('transport_mode').notNull().default('unknown'),
     geom: geometryLineString('geom'),

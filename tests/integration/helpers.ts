@@ -72,6 +72,38 @@ export async function clusterNow(cookie: string, journeyId: string) {
   return res.json()
 }
 
+export async function listActivities(cookie: string, journeyId: string) {
+  const res = await fetch(`${BASE_URL}/api/journeys/${journeyId}/activities`, { headers: { cookie } })
+  return res.json()
+}
+
+export async function uploadActivity(cookie: string, journeyId: string, buffer: Buffer, filename: string) {
+  const form = new FormData()
+  form.append('file', new Blob([buffer], { type: 'application/gpx+xml' }), filename)
+  const res = await fetch(`${BASE_URL}/api/journeys/${journeyId}/activities`, { method: 'POST', headers: { cookie }, body: form })
+  return { status: res.status, body: await res.json() }
+}
+
+export type GpxPoint = { lat: number; lon: number; ele?: number; time: string }
+
+export function makeGpx(points: GpxPoint[], opts: { name?: string; type?: string } = {}): Buffer {
+  const trkpts = points
+    .map(
+      (p) =>
+        `<trkpt lat="${p.lat}" lon="${p.lon}">${p.ele != null ? `<ele>${p.ele}</ele>` : ''}<time>${p.time}</time></trkpt>`
+    )
+    .join('')
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="journeys-tests" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    ${opts.name ? `<name>${opts.name}</name>` : ''}
+    ${opts.type ? `<type>${opts.type}</type>` : ''}
+    <trkseg>${trkpts}</trkseg>
+  </trk>
+</gpx>`
+  return Buffer.from(xml, 'utf-8')
+}
+
 export async function waitForAllProcessed(cookie: string, journeyId: string, expectedCount: number, timeoutMs = 20_000) {
   const start = Date.now()
   while (Date.now() - start < timeoutMs) {
