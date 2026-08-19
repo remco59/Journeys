@@ -1,8 +1,13 @@
+import tailwindcss from '@tailwindcss/vite'
+
 export default defineNuxtConfig({
   compatibilityDate: '2025-06-01',
   devtools: { enabled: true },
   modules: ['@pinia/nuxt'],
   css: ['~/assets/css/main.css'],
+  vite: {
+    plugins: [tailwindcss()]
+  },
   runtimeConfig: {
     databaseUrl: process.env.DATABASE_URL,
     sessionCookieName: process.env.SESSION_COOKIE_NAME || 'journeys_session',

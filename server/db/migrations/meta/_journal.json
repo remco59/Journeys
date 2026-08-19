@@ -8,6 +8,13 @@
       "when": 1787140777610,
       "tag": "0000_awesome_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787141330621,
+      "tag": "0001_ancient_champions",
+      "breakpoints": true
     }
   ]
 }

@@ -31,6 +31,9 @@
   },
   "devDependencies": {
     "typescript": "^5.7.2",
+    "tailwindcss": "^4.3.3",
+    "@tailwindcss/vite": "^4.3.3",
+    "vue-tsc": "^3.3.10",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.19.2",
     "vitest": "^2.1.8",

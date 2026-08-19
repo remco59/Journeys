@@ -13,8 +13,11 @@ export const useAuthStore = defineStore('auth', {
   }),
   actions: {
     async fetchSession() {
-      const { user } = await $fetch('/api/auth/session')
-      this.user = user as AuthUser | null
+      // Plain $fetch on the server doesn't forward the incoming request's
+      // cookies, so SSR would never see an already-authenticated session.
+      const requestFetch = import.meta.server ? useRequestFetch() : $fetch
+      const response = await requestFetch<{ user: AuthUser | null }>('/api/auth/session')
+      this.user = response.user
       this.loaded = true
       return this.user
     },
