@@ -1,6 +1,7 @@
-import { pgTable, pgEnum, uuid, varchar, boolean, real, integer, timestamp, jsonb, text, index } from 'drizzle-orm/pg-core'
+import { pgTable, pgEnum, uuid, varchar, boolean, real, integer, timestamp, jsonb, text, index, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { journeys } from './journeys'
 import { importFiles } from './imports'
+import { sections } from './sections'
 import { confidenceEnum, provenanceEnum } from './enums'
 import { geometryPoint } from '../postgis'
 
@@ -29,8 +30,9 @@ export const photos = pgTable(
     locationSource: photoLocationSourceEnum('location_source').notNull().default('unresolved'),
     locationConfidence: confidenceEnum('location_confidence').notNull().default('inferred'),
 
-    // No FK yet: sections doesn't exist until Phase 4, which adds the constraint.
-    sectionId: uuid('section_id'),
+    // Explicit AnyPgColumn return type breaks the journeys<->photos<->sections
+    // circular type-inference cycle (see journeys.ts's coverPhotoId).
+    sectionId: uuid('section_id').references((): AnyPgColumn => sections.id, { onDelete: 'set null' }),
 
     caption: text('caption'),
     isCover: boolean('is_cover').notNull().default(false),

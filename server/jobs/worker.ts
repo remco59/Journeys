@@ -1,6 +1,7 @@
 import { run } from 'graphile-worker'
 import { serverConfig } from '../config'
 import { processPhotoTask } from './tasks/process-photo'
+import { clusterJourneyTask } from './tasks/cluster-journey'
 
 async function main() {
   if (!serverConfig.databaseUrl) {
@@ -13,7 +14,8 @@ async function main() {
     connectionString: serverConfig.databaseUrl,
     concurrency: 4,
     taskList: {
-      'process-photo': processPhotoTask
+      'process-photo': processPhotoTask,
+      'cluster-journey': clusterJourneyTask
     }
   })
 

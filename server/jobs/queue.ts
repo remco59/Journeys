@@ -23,10 +23,13 @@ export type JobPayloads = {
 export async function enqueueJob<T extends keyof JobPayloads>(
   taskName: T,
   payload: JobPayloads[T],
-  opts?: { jobKey?: string }
+  opts?: { jobKey?: string; runAt?: Date }
 ): Promise<void> {
   const utils = await getUtils()
   // graphile-worker's own generics key off a module-augmented Tasks map we
   // don't use; JobPayloads is our app-level type safety for callers instead.
-  await utils.addJob(taskName as string, payload, opts?.jobKey ? { jobKey: opts.jobKey } : undefined)
+  await utils.addJob(taskName as string, payload, {
+    ...(opts?.jobKey ? { jobKey: opts.jobKey } : {}),
+    ...(opts?.runAt ? { runAt: opts.runAt } : {})
+  })
 }

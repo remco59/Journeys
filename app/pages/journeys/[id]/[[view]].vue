@@ -42,6 +42,32 @@ const durationDays = computed(() => {
 })
 
 const { data: photos, refresh: refreshPhotos } = await useFetch(`/api/journeys/${id}/photos`)
+const { data: sections, refresh: refreshSections } = await useFetch(`/api/journeys/${id}/sections`)
+
+const photosBySection = computed(() => {
+  const map = new Map<string | null, NonNullable<typeof photos.value>>()
+  for (const photo of photos.value ?? []) {
+    const key = photo.sectionId
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push(photo)
+  }
+  return map
+})
+const unsortedPhotos = computed(() => photosBySection.value.get(null) ?? [])
+
+const reclustering = ref(false)
+async function onUploaded() {
+  await refreshPhotos()
+}
+async function onRecluster() {
+  reclustering.value = true
+  try {
+    await $fetch(`/api/journeys/${id}/cluster`, { method: 'POST' })
+    await Promise.all([refreshPhotos(), refreshSections()])
+  } finally {
+    reclustering.value = false
+  }
+}
 </script>
 
 <template>
@@ -79,9 +105,38 @@ const { data: photos, refresh: refreshPhotos } = await useFetch(`/api/journeys/$
     </header>
 
     <main class="mx-auto max-w-4xl px-6 py-10">
-      <p class="mb-6 text-sm text-(--color-ink-soft)">Trip, Map, Story and Gallery views land in later phases — this is a working photo pipeline preview.</p>
-      <PhotoPhotoUploader :journey-id="id" class="mb-6" @uploaded="refreshPhotos" />
-      <PhotoPhotoGrid :photos="photos ?? []" />
+      <div class="mb-6 flex items-start justify-between gap-4">
+        <p class="text-sm text-(--color-ink-soft)">Trip, Map and Gallery views land in later phases — this is the Story so far.</p>
+        <button
+          class="shrink-0 rounded-lg border border-(--color-line) px-3 py-1.5 text-sm text-(--color-ink-soft) hover:text-(--color-ink) disabled:opacity-60"
+          :disabled="reclustering"
+          @click="onRecluster"
+        >
+          {{ reclustering ? 'Reclustering…' : 'Recluster now' }}
+        </button>
+      </div>
+
+      <PhotoPhotoUploader :journey-id="id" class="mb-8" @uploaded="onUploaded" />
+
+      <div class="space-y-5">
+        <StoryStorySectionCard
+          v-for="section in sections"
+          :key="section.id"
+          :section="section"
+          :photos="photosBySection.get(section.id) ?? []"
+        />
+
+        <div v-if="unsortedPhotos.length" class="rounded-2xl border border-dashed border-(--color-line) p-5">
+          <h3 class="mb-3 font-(family-name:--font-display) text-lg font-medium text-(--color-ink-soft)">
+            Unsorted ({{ unsortedPhotos.length }})
+          </h3>
+          <PhotoPhotoGrid :photos="unsortedPhotos" />
+        </div>
+
+        <p v-if="!sections?.length && !unsortedPhotos.length" class="text-sm text-(--color-ink-soft)">
+          No photos yet — upload some to see the Story build itself.
+        </p>
+      </div>
     </main>
   </div>
 </template>

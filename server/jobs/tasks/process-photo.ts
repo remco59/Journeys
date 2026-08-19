@@ -6,7 +6,12 @@ import { getPhotoById, applyExtractedMetadata, maybeSetJourneyCover } from '../.
 import { markImportFileStatus } from '../../domain/imports/imports'
 import { extractPhotoMetadata } from '../../domain/photos/exif'
 import { generateDerivedImages } from '../../domain/photos/images'
-import type { JobPayloads } from '../queue'
+import { enqueueJob, type JobPayloads } from '../queue'
+
+// Coalesces bursty uploads: each processed photo re-schedules the same
+// pending job a few seconds out (jobKey + runAt), so a batch of 50 photos
+// triggers one recluster shortly after the last one finishes, not 50.
+const CLUSTER_DEBOUNCE_MS = 10_000
 
 export async function processPhotoTask(payload: JobPayloads['process-photo']): Promise<void> {
   const photo = await getPhotoById(payload.photoId)
@@ -35,6 +40,12 @@ export async function processPhotoTask(payload: JobPayloads['process-photo']): P
     if (photo.importFileId) {
       await markImportFileStatus(photo.importFileId, 'processed')
     }
+
+    await enqueueJob(
+      'cluster-journey',
+      { journeyId: photo.journeyId },
+      { jobKey: `cluster-journey:${photo.journeyId}`, runAt: new Date(Date.now() + CLUSTER_DEBOUNCE_MS) }
+    )
   } catch (err) {
     if (photo.importFileId) {
       await markImportFileStatus(photo.importFileId, 'failed', (err as Error).message)
