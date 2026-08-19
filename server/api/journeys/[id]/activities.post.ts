@@ -12,6 +12,12 @@ type UploadResult =
   | { filename: string; status: 'duplicate' }
   | { filename: string; status: 'rejected'; reason: string }
 
+const MIME_BY_FORMAT: Record<'gpx' | 'tcx' | 'fit', string> = {
+  gpx: 'application/gpx+xml',
+  tcx: 'application/vnd.garmin.tcx+xml',
+  fit: 'application/vnd.ant.fit'
+}
+
 export default defineEventHandler(async (event) => {
   const user = requireUser(event)
   const journeyId = getRouterParam(event, 'id')!
@@ -28,7 +34,10 @@ export default defineEventHandler(async (event) => {
   }
 
   const storage = getStorage()
-  const importRow = await createImport(journeyId, 'gpx', user.id)
+  // A batch can only carry one source_type label; use the first recognized
+  // format as representative (mixed-format batches are a rare edge case).
+  const firstFormat = fileParts.map((p) => getActivityImporter(path.extname(p.filename!))?.sourceFormat).find(Boolean) ?? 'gpx'
+  const importRow = await createImport(journeyId, firstFormat, user.id)
   const results: UploadResult[] = []
 
   for (const part of fileParts) {
@@ -55,22 +64,23 @@ export default defineEventHandler(async (event) => {
         continue
       }
 
+      const mimeType = MIME_BY_FORMAT[importer.sourceFormat]
       const storageKey = `${journeyId}/${checksum}/original${ext}`
-      await storage.put(storageKey, part.data, { contentType: 'application/gpx+xml' })
+      await storage.put(storageKey, part.data, { contentType: mimeType })
 
       const importFile = await createImportFile({
         importId: importRow.id,
         journeyId,
         originalFilename: filename,
         storageKey,
-        mimeType: 'application/gpx+xml',
+        mimeType,
         sizeBytes: part.data.length,
         checksumSha256: checksum
       })
 
       const activityIds: string[] = []
       for (const normalized of normalizedActivities) {
-        const created = await createActivityFromImport(journeyId, importFile.id, normalized)
+        const created = await createActivityFromImport(journeyId, importFile.id, normalized, importer.sourceFormat)
         if (created) activityIds.push(created.id)
       }
 

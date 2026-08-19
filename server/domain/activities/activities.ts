@@ -11,7 +11,8 @@ const MAX_GEOM_POINTS = 300
 export async function createActivityFromImport(
   journeyId: string,
   rawImportFileId: string,
-  normalized: NormalizedActivity
+  normalized: NormalizedActivity,
+  sourceFormat: 'gpx' | 'tcx' | 'fit'
 ) {
   const stats = computeActivityStats(normalized.points)
   if (!stats) return null // no timestamps — can't place it in the Story
@@ -33,7 +34,7 @@ export async function createActivityFromImport(
       rawImportFileId,
       title: normalized.title,
       type: normalized.type,
-      sourceFormat: 'gpx',
+      sourceFormat,
       startedAt: stats.startedAt,
       endedAt: stats.endedAt,
       distanceM: stats.distanceM,

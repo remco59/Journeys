@@ -38,13 +38,13 @@ async function onFilesSelected(event: Event) {
 
 <template>
   <div class="rounded-2xl border border-dashed border-(--color-line) p-6 text-center">
-    <input ref="fileInput" type="file" accept=".gpx" multiple class="hidden" @change="onFilesSelected" />
+    <input ref="fileInput" type="file" accept=".gpx,.tcx,.fit" multiple class="hidden" @change="onFilesSelected" />
     <button
       class="rounded-lg border border-(--color-line) px-4 py-2 text-sm text-(--color-ink-soft) hover:text-(--color-ink) disabled:opacity-60"
       :disabled="uploading"
       @click="fileInput?.click()"
     >
-      {{ uploading ? 'Importing…' : 'Import GPX' }}
+      {{ uploading ? 'Importing…' : 'Import activity (GPX/TCX/FIT)' }}
     </button>
     <p v-if="error" class="mt-2 text-sm text-red-600">{{ error }}</p>
     <ul v-if="lastResults.length" class="mt-3 space-y-1 text-left text-sm text-(--color-ink-soft)">

@@ -35,7 +35,8 @@
     "@aws-sdk/s3-request-presigner": "^3.1113.0",
     "file-type": "^22.0.2",
     "leaflet": "^1.9.4",
-    "fast-xml-parser": "^5.11.0"
+    "fast-xml-parser": "^5.11.0",
+    "@garmin/fitsdk": "^21.213.0"
   },
   "devDependencies": {
     "typescript": "^5.7.2",

@@ -1,5 +1,6 @@
 import sharp from 'sharp'
 import { ExifTool } from 'exiftool-vendored'
+import { Encoder, Profile } from '@garmin/fitsdk'
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -82,6 +83,72 @@ export async function uploadActivity(cookie: string, journeyId: string, buffer: 
   form.append('file', new Blob([buffer], { type: 'application/gpx+xml' }), filename)
   const res = await fetch(`${BASE_URL}/api/journeys/${journeyId}/activities`, { method: 'POST', headers: { cookie }, body: form })
   return { status: res.status, body: await res.json() }
+}
+
+export type ActivityPoint = { lat: number; lon: number; ele?: number; time: string; heartRate?: number }
+
+export function makeTcx(points: ActivityPoint[], sport: string): Buffer {
+  const trackpoints = points
+    .map(
+      (p) => `<Trackpoint>
+        <Time>${p.time}</Time>
+        <Position><LatitudeDegrees>${p.lat}</LatitudeDegrees><LongitudeDegrees>${p.lon}</LongitudeDegrees></Position>
+        ${p.ele != null ? `<AltitudeMeters>${p.ele}</AltitudeMeters>` : ''}
+        ${p.heartRate != null ? `<HeartRateBpm><Value>${p.heartRate}</Value></HeartRateBpm>` : ''}
+      </Trackpoint>`
+    )
+    .join('')
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2">
+  <Activities>
+    <Activity Sport="${sport}">
+      <Id>${points[0]?.time ?? ''}</Id>
+      <Lap><Track>${trackpoints}</Track></Lap>
+    </Activity>
+  </Activities>
+</TrainingCenterDatabase>`
+  return Buffer.from(xml, 'utf-8')
+}
+
+function toSemicircles(deg: number): number {
+  return Math.round(deg * (2 ** 31 / 180))
+}
+
+export function makeFit(points: ActivityPoint[], sport: string): Buffer {
+  const encoder = new Encoder()
+  const first = points[0]!
+  const last = points[points.length - 1]!
+
+  encoder.writeMesg({
+    mesgNum: Profile.MesgNum.FILE_ID,
+    type: 'activity',
+    manufacturer: 'development',
+    product: 0,
+    timeCreated: new Date(first.time),
+    serialNumber: 1
+  })
+
+  for (const p of points) {
+    encoder.writeMesg({
+      mesgNum: Profile.MesgNum.RECORD,
+      timestamp: new Date(p.time),
+      positionLat: toSemicircles(p.lat),
+      positionLong: toSemicircles(p.lon),
+      ...(p.ele != null ? { altitude: p.ele } : {}),
+      ...(p.heartRate != null ? { heartRate: p.heartRate } : {})
+    })
+  }
+
+  encoder.writeMesg({
+    mesgNum: Profile.MesgNum.SESSION,
+    timestamp: new Date(last.time),
+    startTime: new Date(first.time),
+    sport,
+    totalElapsedTime: (new Date(last.time).getTime() - new Date(first.time).getTime()) / 1000
+  })
+
+  return Buffer.from(encoder.close())
 }
 
 export type GpxPoint = { lat: number; lon: number; ele?: number; time: string }
