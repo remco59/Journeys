@@ -11,7 +11,8 @@ const props = defineProps<{
   }
 }>()
 
-const emit = defineEmits<{ locate: [] }>()
+const emit = defineEmits<{ locate: []; edit: [] }>()
+const readonly = useReadonly()
 
 const TYPE_LABEL: Record<string, string> = {
   cycling: 'Cycling',
@@ -37,16 +38,23 @@ const elevationLabel = computed(() =>
 </script>
 
 <template>
-  <button
-    class="block w-full rounded-2xl border border-(--color-pine)/30 bg-(--color-pine)/[0.06] p-5 text-left transition hover:border-(--color-pine)/60"
-    @click="emit('locate')"
-  >
-    <p class="font-(family-name:--font-display) text-lg font-medium text-(--color-pine)">{{ TYPE_LABEL[activity.type] }}</p>
-    <p class="mt-0.5 text-sm text-(--color-ink-soft)">{{ activity.title }}</p>
-    <p class="mt-2 flex flex-wrap gap-x-4 text-sm text-(--color-ink)">
-      <span v-if="distanceLabel">{{ distanceLabel }}</span>
-      <span>{{ durationLabel }}</span>
-      <span v-if="elevationLabel">{{ elevationLabel }}</span>
-    </p>
-  </button>
+  <div class="relative rounded-2xl border border-(--color-pine)/30 bg-(--color-pine)/[0.06] p-5 transition hover:border-(--color-pine)/60">
+    <button class="block w-full text-left" @click="emit('locate')">
+      <p class="font-(family-name:--font-display) text-lg font-medium text-(--color-pine)">{{ TYPE_LABEL[activity.type] }}</p>
+      <p class="mt-0.5 text-sm text-(--color-ink-soft)">{{ activity.title }}</p>
+      <p class="mt-2 flex flex-wrap gap-x-4 text-sm text-(--color-ink)">
+        <span v-if="distanceLabel">{{ distanceLabel }}</span>
+        <span>{{ durationLabel }}</span>
+        <span v-if="elevationLabel">{{ elevationLabel }}</span>
+      </p>
+    </button>
+    <button
+      v-if="!readonly"
+      type="button"
+      class="absolute right-4 top-4 text-xs text-(--color-ink-soft) hover:text-(--color-ink)"
+      @click.stop="emit('edit')"
+    >
+      Edit
+    </button>
+  </div>
 </template>

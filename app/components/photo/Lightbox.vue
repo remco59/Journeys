@@ -9,6 +9,9 @@ type Photo = {
   cameraMake?: string | null
   cameraModel?: string | null
   sectionId: string | null
+  locationSource: string
+  lat?: number | null
+  lon?: number | null
 }
 
 const props = defineProps<{
@@ -17,8 +20,9 @@ const props = defineProps<{
   sectionTitleById: Record<string, string>
 }>()
 
-const emit = defineEmits<{ 'update:photoId': [id: string | null] }>()
+const emit = defineEmits<{ 'update:photoId': [id: string | null]; edit: [photo: Photo] }>()
 const filesBase = useFilesBase()
+const readonly = useReadonly()
 
 const index = computed(() => props.photos.findIndex((p) => p.id === props.photoId))
 const current = computed(() => (index.value >= 0 ? props.photos[index.value] : null))
@@ -68,6 +72,13 @@ const cameraLabel = computed(() => {
     @click.self="close"
   >
     <button class="absolute right-4 top-4 z-10 text-2xl text-white/80 hover:text-white" @click="close">✕</button>
+    <button
+      v-if="!readonly"
+      class="absolute right-16 top-5 z-10 text-sm text-white/80 hover:text-white"
+      @click="emit('edit', current)"
+    >
+      Edit
+    </button>
     <button
       v-if="index > 0"
       class="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 px-3 py-4 text-xl text-white hover:bg-white/20"

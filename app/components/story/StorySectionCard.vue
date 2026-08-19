@@ -8,7 +8,15 @@ const props = defineProps<{
     departureAt: string | null
     confidence: 'high' | 'medium' | 'low' | 'inferred'
   }
-  photos: Array<{ id: string; storageKeyThumb: string | null; capturedAt: string | null; locationSource: string }>
+  photos: Array<{
+    id: string
+    storageKeyThumb: string | null
+    capturedAt: string | null
+    caption: string | null
+    locationSource: string
+    lat?: number | null
+    lon?: number | null
+  }>
   otherSections: Array<{ id: string; title: string }>
 }>()
 
@@ -17,6 +25,7 @@ const emit = defineEmits<{
   delete: []
   merge: [intoSectionId: string]
   movePhoto: [photoId: string, sectionId: string]
+  editPhoto: [photo: (typeof props.photos)[number]]
   locate: []
 }>()
 
@@ -70,6 +79,7 @@ const managingPhotos = ref(false)
       :other-sections="otherSections"
       class="mt-3"
       @move="(photoId: string, sectionId: string) => emit('movePhoto', photoId, sectionId)"
+      @edit="(photo) => emit('editPhoto', photo)"
     />
 
     <div v-if="!readonly" class="mt-4 flex flex-wrap items-center gap-3 border-t border-(--color-line) pt-3 text-sm text-(--color-ink-soft)">

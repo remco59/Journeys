@@ -124,6 +124,70 @@ describe('GPX import and activities (live stack)', () => {
     expect(res.status).toBe(404)
   })
 
+  it('edits an activity\'s title and type', async () => {
+    const cookie = await loginCookie(ADMIN_USERNAME, ADMIN_PASSWORD)
+    const journey = await createJourney(cookie)
+    const gpx = makeGpx([
+      { lat: 45, lon: 9, time: '2026-08-19T08:00:00Z' },
+      { lat: 45.01, lon: 9.01, time: '2026-08-19T08:10:00Z' }
+    ])
+    await uploadActivity(cookie, journey.id, gpx, 'ride.gpx')
+    const activityId = (await listActivities(cookie, journey.id))[0].id
+
+    const res = await fetch(`${BASE_URL}/api/activities/${activityId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ title: 'Renamed ride', type: 'hiking' })
+    })
+    expect(res.status).toBe(200)
+
+    const activities = await listActivities(cookie, journey.id)
+    expect(activities[0].title).toBe('Renamed ride')
+    expect(activities[0].type).toBe('hiking')
+  })
+
+  it('deletes an activity', async () => {
+    const cookie = await loginCookie(ADMIN_USERNAME, ADMIN_PASSWORD)
+    const journey = await createJourney(cookie)
+    const gpx = makeGpx([
+      { lat: 45, lon: 9, time: '2026-08-19T08:00:00Z' },
+      { lat: 45.01, lon: 9.01, time: '2026-08-19T08:10:00Z' }
+    ])
+    await uploadActivity(cookie, journey.id, gpx, 'ride.gpx')
+    const activityId = (await listActivities(cookie, journey.id))[0].id
+
+    const res = await fetch(`${BASE_URL}/api/activities/${activityId}`, { method: 'DELETE', headers: { cookie } })
+    expect(res.status).toBe(200)
+
+    const activities = await listActivities(cookie, journey.id)
+    expect(activities).toHaveLength(0)
+  })
+
+  it('never lets another user edit or delete an activity on a journey they do not own', async () => {
+    const cookie = await loginCookie(ADMIN_USERNAME, ADMIN_PASSWORD)
+    const journey = await createJourney(cookie)
+    const gpx = makeGpx([
+      { lat: 45, lon: 9, time: '2026-08-19T08:00:00Z' },
+      { lat: 45.01, lon: 9.01, time: '2026-08-19T08:10:00Z' }
+    ])
+    await uploadActivity(cookie, journey.id, gpx, 'ride.gpx')
+    const activityId = (await listActivities(cookie, journey.id))[0].id
+
+    const otherUsername = `activity-owner-check-${Date.now()}`
+    await createUser(cookie, otherUsername)
+    const otherCookie = await loginCookie(otherUsername, 'a-fine-password')
+
+    const patch = await fetch(`${BASE_URL}/api/activities/${activityId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', cookie: otherCookie },
+      body: JSON.stringify({ title: 'hijacked' })
+    })
+    expect(patch.status).toBe(404)
+
+    const del = await fetch(`${BASE_URL}/api/activities/${activityId}`, { method: 'DELETE', headers: { cookie: otherCookie } })
+    expect(del.status).toBe(404)
+  })
+
   it('produces an "activity" trace (pine, high confidence) when a GPX track covers the gap between two sections', async () => {
     const cookie = await loginCookie(ADMIN_USERNAME, ADMIN_PASSWORD)
     const journey = await createJourney(cookie)

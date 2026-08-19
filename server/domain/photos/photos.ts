@@ -1,6 +1,8 @@
 import { and, eq, or } from 'drizzle-orm'
 import { useDb } from '../../db/client'
 import { photos, journeys } from '../../db/schema'
+import { geoPointSelect } from '../../db/postgis'
+import { getStorage } from '../../storage'
 import type { ExtractedPhotoMetadata } from './exif'
 import type { UpdatePhotoInput } from '../../../shared/types/photos'
 
@@ -59,20 +61,22 @@ export async function getPhotoByPublicStorageKey(key: string) {
   return rows[0] ?? null
 }
 
+/** Includes lat/lon (projected out of the otherwise write-only geom column) — the photo editor's map picker needs real coordinates. */
 export async function listPhotosForJourney(journeyId: string) {
   const db = useDb()
-  return db.select().from(photos).where(eq(photos.journeyId, journeyId)).orderBy(photos.capturedAt)
+  const rows = await db
+    .select({ photo: photos, ...geoPointSelect(photos.geom) })
+    .from(photos)
+    .where(eq(photos.journeyId, journeyId))
+    .orderBy(photos.capturedAt)
+  return rows.map((r) => ({ ...r.photo, lat: r.lat, lon: r.lon }))
 }
 
 export async function listPhotosForOwner(journeyId: string, ownerId: string) {
   const db = useDb()
-  const rows = await db
-    .select({ photo: photos })
-    .from(photos)
-    .innerJoin(journeys, eq(photos.journeyId, journeys.id))
-    .where(and(eq(photos.journeyId, journeyId), eq(journeys.ownerId, ownerId)))
-    .orderBy(photos.capturedAt)
-  return rows.map((r) => r.photo)
+  const owns = await db.select({ id: journeys.id }).from(journeys).where(and(eq(journeys.id, journeyId), eq(journeys.ownerId, ownerId))).limit(1)
+  if (!owns[0]) return null
+  return listPhotosForJourney(journeyId)
 }
 
 export async function applyExtractedMetadata(
@@ -145,4 +149,28 @@ export async function maybeSetJourneyCover(journeyId: string, photoId: string) {
   if (journey && !journey.coverPhotoId) {
     await db.update(journeys).set({ coverPhotoId: photoId }).where(eq(journeys.id, journeyId))
   }
+}
+
+/** "The user must be able to change it." — an explicit, always-applied override, unlike maybeSetJourneyCover. */
+export async function setJourneyCoverPhoto(journeyId: string, photoId: string) {
+  const db = useDb()
+  await db.update(journeys).set({ coverPhotoId: photoId }).where(eq(journeys.id, journeyId))
+}
+
+/**
+ * Removes the DB row and every stored variant (original/preview/thumb).
+ * journeys.coverPhotoId is ON DELETE SET NULL, so a deleted cover photo
+ * unsets itself rather than leaving a dangling reference.
+ */
+export async function deletePhoto(photo: typeof photos.$inferSelect) {
+  const db = useDb()
+  const storage = getStorage()
+
+  await Promise.all(
+    [photo.storageKeyOriginal, photo.storageKeyPreview, photo.storageKeyThumb]
+      .filter((key): key is string => !!key)
+      .map((key) => storage.delete(key))
+  )
+
+  await db.delete(photos).where(eq(photos.id, photo.id))
 }

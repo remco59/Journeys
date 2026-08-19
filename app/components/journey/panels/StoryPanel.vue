@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { useMapSyncStore } from '../../../stores/mapSync'
 
-type SectionSummary = { id: string; title: string; placeName: string | null; description: string | null }
+type SectionSummary = {
+  id: string
+  title: string
+  placeName: string | null
+  description: string | null
+  lat?: number | null
+  lon?: number | null
+}
 
 const props = defineProps<{
   journeyId: string
@@ -12,7 +19,16 @@ const props = defineProps<{
       confidence: 'high' | 'medium' | 'low' | 'inferred'
     }
   >
-  photos: Array<{ id: string; sectionId: string | null; storageKeyThumb: string | null; capturedAt: string | null; locationSource: string }>
+  photos: Array<{
+    id: string
+    sectionId: string | null
+    storageKeyThumb: string | null
+    capturedAt: string | null
+    caption: string | null
+    locationSource: string
+    lat?: number | null
+    lon?: number | null
+  }>
   activities: Array<{
     id: string
     title: string
@@ -109,6 +125,26 @@ async function onLocate(sectionId: string) {
 async function onLocateActivity() {
   await navigateTo(`${linkBase}/map`)
 }
+
+type EditablePhoto = {
+  id: string
+  caption: string | null
+  capturedAt: string | null
+  locationSource: string
+  lat?: number | null
+  lon?: number | null
+}
+
+const photoEditor = ref<{ open: (p: any, point: { lat: number; lon: number } | null) => void } | null>(null)
+function openEditPhoto(photo: EditablePhoto) {
+  const point = photo.lat != null && photo.lon != null ? { lat: photo.lat, lon: photo.lon } : null
+  photoEditor.value?.open(photo, point)
+}
+
+const activityEditor = ref<{ open: (a: (typeof props.activities)[number]) => void } | null>(null)
+function openEditActivity(activity: (typeof props.activities)[number]) {
+  activityEditor.value?.open(activity)
+}
 </script>
 
 <template>
@@ -149,16 +185,17 @@ async function onLocateActivity() {
           @delete="onDeleteSection(item.section.id)"
           @merge="(intoId: string) => onMergeSection(item.section.id, intoId)"
           @move-photo="onMovePhoto"
+          @edit-photo="openEditPhoto"
           @locate="onLocate(item.section.id)"
         />
-        <StoryActivityCard v-else :activity="item.activity" @locate="onLocateActivity" />
+        <StoryActivityCard v-else :activity="item.activity" @locate="onLocateActivity" @edit="openEditActivity(item.activity)" />
       </template>
 
       <div v-if="unsortedPhotos.length" class="rounded-2xl border border-dashed border-(--color-line) p-5">
         <h3 class="mb-3 font-(family-name:--font-display) text-lg font-medium text-(--color-ink-soft)">
           Unsorted ({{ unsortedPhotos.length }})
         </h3>
-        <PhotoGrid :photos="unsortedPhotos" :other-sections="otherSectionsFor(null)" @move="onMovePhoto" />
+        <PhotoGrid :photos="unsortedPhotos" :other-sections="otherSectionsFor(null)" @move="onMovePhoto" @edit="openEditPhoto" />
       </div>
 
       <p v-if="!storyItems.length && !unsortedPhotos.length" class="text-sm text-(--color-ink-soft)">
@@ -168,6 +205,8 @@ async function onLocateActivity() {
 
     <ClientOnly v-if="!readonly">
       <StorySectionEditorDialog ref="sectionEditor" :journey-id="journeyId" :section="editingSection" @saved="emit('refresh')" />
+      <PhotoEditorDialog ref="photoEditor" @saved="emit('refresh')" @deleted="emit('refresh')" />
+      <StoryActivityEditorDialog ref="activityEditor" @saved="emit('refresh')" @deleted="emit('refresh')" />
     </ClientOnly>
   </div>
 </template>

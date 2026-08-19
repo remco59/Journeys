@@ -9,10 +9,14 @@ type Photo = {
   cameraMake?: string | null
   cameraModel?: string | null
   locationSource: string
+  lat?: number | null
+  lon?: number | null
 }
 type Section = { id: string; title: string; placeName: string | null; arrivalAt: string | null }
 
 const props = defineProps<{ sections: Section[]; photos: Photo[] }>()
+
+const emit = defineEmits<{ refresh: [] }>()
 
 const route = useRoute()
 
@@ -44,6 +48,16 @@ const sectionTitleById = computed(() =>
 const lightboxPhotoId = ref<string | null>(null)
 const groupRefs = ref<Record<string, HTMLElement | null>>({})
 
+const photoEditor = ref<{ open: (p: any, point: { lat: number; lon: number } | null) => void } | null>(null)
+function openEditPhoto(photo: Photo) {
+  const point = photo.lat != null && photo.lon != null ? { lat: photo.lat, lon: photo.lon } : null
+  photoEditor.value?.open(photo, point)
+}
+function onPhotoChanged() {
+  lightboxPhotoId.value = null
+  emit('refresh')
+}
+
 onMounted(async () => {
   const photoQuery = route.query.photo
   if (typeof photoQuery === 'string') {
@@ -71,6 +85,10 @@ onMounted(async () => {
     </div>
     <p v-else class="text-sm text-(--color-ink-soft)">No photos yet.</p>
 
-    <PhotoLightbox v-model:photo-id="lightboxPhotoId" :photos="photos" :section-title-by-id="sectionTitleById" />
+    <PhotoLightbox v-model:photo-id="lightboxPhotoId" :photos="photos" :section-title-by-id="sectionTitleById" @edit="openEditPhoto" />
+
+    <ClientOnly>
+      <PhotoEditorDialog ref="photoEditor" @saved="onPhotoChanged" @deleted="onPhotoChanged" />
+    </ClientOnly>
   </div>
 </template>

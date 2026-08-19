@@ -8,7 +8,9 @@ import {
   createUser,
   createJourney,
   uploadPhoto,
+  listPhotos,
   waitForPhotoProcessed,
+  waitForAllProcessed,
   makeJpegAt,
   makeJpegNoGps,
   closeExifTool
@@ -100,5 +102,88 @@ describe('photo upload and processing pipeline (live stack)', () => {
       headers: { cookie: otherCookie }
     })
     expect(res.status).toBe(404)
+  }, 30_000)
+
+  it('edits a photo\'s caption, timestamp, and location', async () => {
+    const cookie = await loginCookie(ADMIN_USERNAME, ADMIN_PASSWORD)
+    const journey = await createJourney(cookie)
+    const upload = await uploadPhoto(cookie, journey.id, jpegWithGps, 'editable.jpg')
+    const photoId = upload.body.files[0].photoId
+    await waitForPhotoProcessed(cookie, journey.id, photoId)
+
+    const res = await fetch(`${BASE_URL}/api/photos/${photoId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ caption: 'A lovely view', lat: 46.5, lon: 10.4 })
+    })
+    expect(res.status).toBe(200)
+
+    const photos = await listPhotos(cookie, journey.id)
+    const updated = photos.find((p: any) => p.id === photoId)
+    expect(updated.caption).toBe('A lovely view')
+    expect(updated.lat).toBeCloseTo(46.5, 3)
+    expect(updated.lon).toBeCloseTo(10.4, 3)
+  }, 30_000)
+
+  it('sets a photo as the journey cover', async () => {
+    const cookie = await loginCookie(ADMIN_USERNAME, ADMIN_PASSWORD)
+    const journey = await createJourney(cookie)
+    const first = await uploadPhoto(cookie, journey.id, jpegWithGps, 'first.jpg')
+    const second = await uploadPhoto(cookie, journey.id, jpegNoGps, 'second.jpg')
+    await waitForAllProcessed(cookie, journey.id, 2)
+    const secondPhotoId = second.body.files[0].photoId
+
+    const res = await fetch(`${BASE_URL}/api/photos/${secondPhotoId}/set-cover`, { method: 'POST', headers: { cookie } })
+    expect(res.status).toBe(200)
+
+    const journeyRes = await fetch(`${BASE_URL}/api/journeys/${journey.id}`, { headers: { cookie } })
+    expect((await journeyRes.json()).coverPhotoId).toBe(secondPhotoId)
+    void first
+  }, 30_000)
+
+  it('deletes a photo, which stops appearing anywhere and can no longer be edited', async () => {
+    const cookie = await loginCookie(ADMIN_USERNAME, ADMIN_PASSWORD)
+    const journey = await createJourney(cookie)
+    const upload = await uploadPhoto(cookie, journey.id, jpegWithGps, 'to-delete.jpg')
+    const photoId = upload.body.files[0].photoId
+    await waitForPhotoProcessed(cookie, journey.id, photoId)
+
+    const del = await fetch(`${BASE_URL}/api/photos/${photoId}`, { method: 'DELETE', headers: { cookie } })
+    expect(del.status).toBe(200)
+
+    const photos = await listPhotos(cookie, journey.id)
+    expect(photos.find((p: any) => p.id === photoId)).toBeUndefined()
+
+    const patchAfterDelete = await fetch(`${BASE_URL}/api/photos/${photoId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ caption: 'too late' })
+    })
+    expect(patchAfterDelete.status).toBe(404)
+  }, 30_000)
+
+  it('never lets another user edit, delete, or set-cover a photo they do not own', async () => {
+    const adminCookie = await loginCookie(ADMIN_USERNAME, ADMIN_PASSWORD)
+    const journey = await createJourney(adminCookie)
+    const upload = await uploadPhoto(adminCookie, journey.id, jpegWithGps, 'owned.jpg')
+    const photoId = upload.body.files[0].photoId
+    await waitForPhotoProcessed(adminCookie, journey.id, photoId)
+
+    const otherUsername = `photo-owner-check-${Date.now()}`
+    await createUser(adminCookie, otherUsername)
+    const otherCookie = await loginCookie(otherUsername, 'a-fine-password')
+
+    const patch = await fetch(`${BASE_URL}/api/photos/${photoId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', cookie: otherCookie },
+      body: JSON.stringify({ caption: 'hijacked' })
+    })
+    expect(patch.status).toBe(404)
+
+    const setCover = await fetch(`${BASE_URL}/api/photos/${photoId}/set-cover`, { method: 'POST', headers: { cookie: otherCookie } })
+    expect(setCover.status).toBe(404)
+
+    const del = await fetch(`${BASE_URL}/api/photos/${photoId}`, { method: 'DELETE', headers: { cookie: otherCookie } })
+    expect(del.status).toBe(404)
   }, 30_000)
 })

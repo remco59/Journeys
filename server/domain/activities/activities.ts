@@ -96,3 +96,48 @@ export async function listActivityWindowsForJourney(journeyId: string) {
     .from(activities)
     .where(eq(activities.journeyId, journeyId))
 }
+
+export async function getActivityForOwner(activityId: string, ownerId: string) {
+  const db = useDb()
+  const rows = await db
+    .select({ activity: activities })
+    .from(activities)
+    .innerJoin(journeys, eq(activities.journeyId, journeys.id))
+    .where(and(eq(activities.id, activityId), eq(journeys.ownerId, ownerId)))
+    .limit(1)
+  return rows[0]?.activity ?? null
+}
+
+/** Every field the caller touches becomes both the new value AND a locked field — same provenance mechanism as sections/photos (§12). */
+export async function updateActivityWithLocks(
+  activity: typeof activities.$inferSelect,
+  input: { title?: string; type?: (typeof activities.$inferInsert)['type']; sectionId?: string | null }
+) {
+  const db = useDb()
+  const patch: Partial<typeof activities.$inferInsert> = {}
+  const newLocks = new Set(activity.lockedFields)
+
+  if (input.title !== undefined) {
+    patch.title = input.title
+    newLocks.add('title')
+  }
+  if (input.type !== undefined) {
+    patch.type = input.type
+    newLocks.add('type')
+  }
+  if (input.sectionId !== undefined) {
+    patch.sectionId = input.sectionId
+    newLocks.add('sectionId')
+  }
+
+  patch.source = 'user_override'
+  patch.lockedFields = [...newLocks]
+
+  const [updated] = await db.update(activities).set(patch).where(eq(activities.id, activity.id)).returning()
+  return updated!
+}
+
+export async function deleteActivityById(activityId: string) {
+  const db = useDb()
+  await db.delete(activities).where(eq(activities.id, activityId))
+}

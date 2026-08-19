@@ -1,20 +1,26 @@
 <script setup lang="ts">
+type Photo = {
+  id: string
+  storageKeyThumb: string | null
+  capturedAt: string | null
+  caption: string | null
+  locationSource: string
+  lat?: number | null
+  lon?: number | null
+}
+
 const filesBase = useFilesBase()
+const readonly = useReadonly()
 
 withDefaults(
   defineProps<{
-    photos: Array<{
-      id: string
-      storageKeyThumb: string | null
-      capturedAt: string | null
-      locationSource: string
-    }>
+    photos: Photo[]
     otherSections?: Array<{ id: string; title: string }>
   }>(),
   { otherSections: () => [] }
 )
 
-const emit = defineEmits<{ move: [photoId: string, sectionId: string] }>()
+const emit = defineEmits<{ move: [photoId: string, sectionId: string]; edit: [photo: Photo] }>()
 
 function onMove(photoId: string, event: Event) {
   const sectionId = (event.target as HTMLSelectElement).value
@@ -46,6 +52,15 @@ function onMove(photoId: string, event: Event) {
       >
         ?
       </span>
+      <button
+        v-if="!readonly"
+        type="button"
+        class="absolute left-1 top-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[10px] text-white opacity-0 hover:bg-black/75 focus:opacity-100 group-hover:opacity-100"
+        title="Edit photo"
+        @click="emit('edit', photo)"
+      >
+        ✎
+      </button>
       <select
         v-if="otherSections.length"
         class="absolute inset-x-0 bottom-0 w-full truncate border-0 bg-black/55 px-1 py-0.5 text-[10px] text-white opacity-0 focus:opacity-100 group-hover:opacity-100"

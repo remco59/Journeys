@@ -123,7 +123,12 @@ const shareDialog = ref<{ open: () => void } | null>(null)
         :activities="activities ?? []"
         @refresh="refreshAll"
       />
-      <JourneyPanelsGalleryPanel v-else-if="activeView === 'gallery'" :sections="sections ?? []" :photos="photos ?? []" />
+      <JourneyPanelsGalleryPanel
+        v-else-if="activeView === 'gallery'"
+        :sections="sections ?? []"
+        :photos="photos ?? []"
+        @refresh="refreshAll"
+      />
     </main>
 
     <JourneyBottomNav :active="activeView" />
