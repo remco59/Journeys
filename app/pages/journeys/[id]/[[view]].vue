@@ -7,6 +7,8 @@ const activeView = computed(() => {
   return (key ?? 'trip') as 'trip' | 'map' | 'story' | 'gallery'
 })
 
+provideJourneyContext({ filesBase: '/api/files', linkBase: `/journeys/${id}`, readonly: false })
+
 const { data: journey, refresh } = await useFetch(`/api/journeys/${id}`)
 if (!journey.value) {
   throw createError({ statusCode: 404, statusMessage: 'Journey not found' })
@@ -69,6 +71,8 @@ async function onEditTrace(traceId: string, transportMode: string) {
   await $fetch(`/api/traces/${traceId}`, { method: 'PATCH', body: { transportMode } })
   await refreshTraces()
 }
+
+const shareDialog = ref<{ open: () => void } | null>(null)
 </script>
 
 <template>
@@ -85,6 +89,7 @@ async function onEditTrace(traceId: string, transportMode: string) {
           <p v-if="journey.description" class="mt-3 max-w-2xl text-(--color-ink)">{{ journey.description }}</p>
           <div class="mt-4 flex gap-3 text-sm">
             <button class="text-(--color-ink-soft) hover:text-(--color-ink)" @click="editing = true">Edit</button>
+            <button class="text-(--color-ink-soft) hover:text-(--color-ink)" @click="shareDialog?.open()">Share</button>
             <button class="text-red-600 hover:text-red-700" @click="onDelete">Delete</button>
           </div>
         </div>
@@ -106,7 +111,7 @@ async function onEditTrace(traceId: string, transportMode: string) {
     </header>
 
     <main>
-      <JourneyPanelsTripPanel v-if="activeView === 'trip'" :journey-id="id" :sections="sections ?? []" :photos-by-section="photosBySection" />
+      <JourneyPanelsTripPanel v-if="activeView === 'trip'" :sections="sections ?? []" :photos-by-section="photosBySection" />
       <ClientOnly v-else-if="activeView === 'map'">
         <JourneyPanelsMapPanel :sections="sections ?? []" :traces="traces ?? []" :photos="photos ?? []" @edit-trace="onEditTrace" />
       </ClientOnly>
@@ -121,6 +126,10 @@ async function onEditTrace(traceId: string, transportMode: string) {
       <JourneyPanelsGalleryPanel v-else-if="activeView === 'gallery'" :sections="sections ?? []" :photos="photos ?? []" />
     </main>
 
-    <JourneyBottomNav :journey-id="id" :active="activeView" />
+    <JourneyBottomNav :active="activeView" />
+
+    <ClientOnly>
+      <JourneyShareDialog ref="shareDialog" :journey-id="id" />
+    </ClientOnly>
   </div>
 </template>

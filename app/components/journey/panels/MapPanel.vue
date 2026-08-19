@@ -23,6 +23,8 @@ const PINE = '#2f6b52'
 const TRANSPORT_MODES: TransportMode[] = ['walking', 'cycling', 'car', 'train', 'bus', 'ferry', 'flight', 'unknown']
 
 const mapSync = useMapSyncStore()
+const filesBase = useFilesBase()
+const readonly = useReadonly()
 const containerEl = ref<HTMLElement | null>(null)
 const { map, fitToBounds, focus } = useLeafletMap(containerEl)
 
@@ -54,6 +56,14 @@ function buildTracePopup(trace: Trace): HTMLElement {
   reason.style.cssText = 'margin-bottom:6px;color:#666;font-size:12px'
   reason.textContent = trace.transportModeReason ?? 'No inference reason recorded'
   container.appendChild(reason)
+
+  if (readonly) {
+    const label = document.createElement('div')
+    label.style.cssText = 'font-weight:600'
+    label.textContent = trace.transportMode
+    container.appendChild(label)
+    return container
+  }
 
   const select = document.createElement('select')
   select.style.cssText = 'width:100%;padding:2px 4px'
@@ -93,7 +103,7 @@ function render() {
     if (section.lat == null || section.lon == null) continue
     const photo = firstPhotoBySection.value.get(section.id)
     const iconHtml = photo?.storageKeyThumb
-      ? `<img src="/api/files/${encodeURIComponent(photo.storageKeyThumb)}" style="width:100%;height:100%;object-fit:cover;border-radius:9999px;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)" />`
+      ? `<img src="${filesBase}/${encodeURIComponent(photo.storageKeyThumb)}" style="width:100%;height:100%;object-fit:cover;border-radius:9999px;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)" />`
       : `<div style="width:100%;height:100%;border-radius:9999px;background:${GOLD};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`
 
     const icon = L.divIcon({ html: iconHtml, className: '', iconSize: [36, 36] })

@@ -5,8 +5,9 @@ type Photo = {
   storageKeyThumb: string | null
   capturedAt: string | null
   caption: string | null
-  cameraMake: string | null
-  cameraModel: string | null
+  // Absent entirely on shared/public payloads (§22) — never required.
+  cameraMake?: string | null
+  cameraModel?: string | null
   sectionId: string | null
 }
 
@@ -17,6 +18,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ 'update:photoId': [id: string | null] }>()
+const filesBase = useFilesBase()
 
 const index = computed(() => props.photos.findIndex((p) => p.id === props.photoId))
 const current = computed(() => (index.value >= 0 ? props.photos[index.value] : null))
@@ -84,7 +86,7 @@ const cameraLabel = computed(() => {
     <div class="flex flex-1 items-center justify-center overflow-hidden p-4 pb-0">
       <img
         v-if="current.storageKeyPreview || current.storageKeyThumb"
-        :src="`/api/files/${encodeURIComponent(current.storageKeyPreview ?? current.storageKeyThumb!)}`"
+        :src="`${filesBase}/${encodeURIComponent(current.storageKeyPreview ?? current.storageKeyThumb!)}`"
         class="max-h-full max-w-full object-contain"
         :alt="current.caption ?? dateLabel ?? 'photo'"
       />

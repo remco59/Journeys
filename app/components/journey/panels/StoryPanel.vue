@@ -27,6 +27,8 @@ const props = defineProps<{
 const emit = defineEmits<{ refresh: [] }>()
 
 const mapSync = useMapSyncStore()
+const readonly = useReadonly()
+const linkBase = useLinkBase()
 
 const photosBySection = computed(() => {
   const map = new Map<string | null, typeof props.photos>()
@@ -56,6 +58,7 @@ const storyItems = computed<StoryItem[]>(() => {
 })
 
 function otherSectionsFor(sectionId: string | null) {
+  if (readonly) return []
   return props.sections.filter((s) => s.id !== sectionId).map((s) => ({ id: s.id, title: s.title }))
 }
 
@@ -100,11 +103,11 @@ async function onMovePhoto(photoId: string, sectionId: string) {
 
 async function onLocate(sectionId: string) {
   mapSync.select(sectionId)
-  await navigateTo(`/journeys/${props.journeyId}/map`)
+  await navigateTo(`${linkBase}/map`)
 }
 
 async function onLocateActivity() {
-  await navigateTo(`/journeys/${props.journeyId}/map`)
+  await navigateTo(`${linkBase}/map`)
 }
 </script>
 
@@ -112,7 +115,7 @@ async function onLocateActivity() {
   <div class="mx-auto max-w-4xl px-6 py-10">
     <div class="mb-6 flex items-start justify-between gap-4">
       <p class="text-sm text-(--color-ink-soft)">{{ sections.length }} section{{ sections.length === 1 ? '' : 's' }}</p>
-      <div class="flex shrink-0 gap-2">
+      <div v-if="!readonly" class="flex shrink-0 gap-2">
         <button
           class="rounded-lg border border-(--color-line) px-3 py-1.5 text-sm text-(--color-ink-soft) hover:text-(--color-ink)"
           @click="openNewSection"
@@ -129,7 +132,7 @@ async function onLocateActivity() {
       </div>
     </div>
 
-    <div class="mb-8 grid gap-3 sm:grid-cols-3">
+    <div v-if="!readonly" class="mb-8 grid gap-3 sm:grid-cols-3">
       <PhotoPhotoUploader :journey-id="journeyId" @uploaded="emit('refresh')" />
       <ActivityActivityUploader :journey-id="journeyId" @uploaded="emit('refresh')" />
       <TimelineTimelineUploader :journey-id="journeyId" @uploaded="emit('refresh')" />
@@ -139,7 +142,6 @@ async function onLocateActivity() {
       <template v-for="item in storyItems" :key="item.kind + (item.kind === 'section' ? item.section.id : item.activity.id)">
         <StoryStorySectionCard
           v-if="item.kind === 'section'"
-          :journey-id="journeyId"
           :section="item.section"
           :photos="photosBySection.get(item.section.id) ?? []"
           :other-sections="otherSectionsFor(item.section.id)"
@@ -160,11 +162,11 @@ async function onLocateActivity() {
       </div>
 
       <p v-if="!storyItems.length && !unsortedPhotos.length" class="text-sm text-(--color-ink-soft)">
-        Nothing yet — upload photos or import a GPX track to see the Story build itself.
+        {{ readonly ? 'Nothing here yet.' : 'Nothing yet — upload photos or import a GPX track to see the Story build itself.' }}
       </p>
     </div>
 
-    <ClientOnly>
+    <ClientOnly v-if="!readonly">
       <StorySectionEditorDialog ref="sectionEditor" :journey-id="journeyId" :section="editingSection" @saved="emit('refresh')" />
     </ClientOnly>
   </div>

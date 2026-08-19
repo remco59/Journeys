@@ -50,6 +50,13 @@
       "when": 1787146802641,
       "tag": "0006_mute_leopardon",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787147167893,
+      "tag": "0007_loud_puck",
+      "breakpoints": true
     }
   ]
 }

@@ -55,11 +55,8 @@ function parseGeom(raw: string | null) {
   return JSON.parse(raw) as { type: 'LineString'; coordinates: [number, number][] }
 }
 
-export async function listActivitiesForOwner(journeyId: string, ownerId: string) {
+export async function listActivitiesForJourney(journeyId: string) {
   const db = useDb()
-  const owns = await db.select({ id: journeys.id }).from(journeys).where(and(eq(journeys.id, journeyId), eq(journeys.ownerId, ownerId))).limit(1)
-  if (!owns[0]) return null
-
   const rows = await db
     .select({
       id: activities.id,
@@ -82,6 +79,13 @@ export async function listActivitiesForOwner(journeyId: string, ownerId: string)
     .orderBy(activities.startedAt)
 
   return rows.map((r) => ({ ...r, geom: parseGeom(r.geomGeoJson), geomGeoJson: undefined }))
+}
+
+export async function listActivitiesForOwner(journeyId: string, ownerId: string) {
+  const db = useDb()
+  const owns = await db.select({ id: journeys.id }).from(journeys).where(and(eq(journeys.id, journeyId), eq(journeys.ownerId, ownerId))).limit(1)
+  if (!owns[0]) return null
+  return listActivitiesForJourney(journeyId)
 }
 
 /** Plain rows (startedAt/endedAt/type only) for trace-reconstruction matching — no need to decode geom there. */

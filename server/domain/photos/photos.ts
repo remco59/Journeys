@@ -44,6 +44,26 @@ export async function getPhotoByStorageKey(key: string) {
   return rows[0] ?? null
 }
 
+/**
+ * Never matches storageKeyOriginal — shared/public visitors only ever see
+ * derived thumb/preview images, never the original file (§22). A request
+ * for an original's key, even with a valid share token, must 404.
+ */
+export async function getPhotoByPublicStorageKey(key: string) {
+  const db = useDb()
+  const rows = await db
+    .select()
+    .from(photos)
+    .where(or(eq(photos.storageKeyPreview, key), eq(photos.storageKeyThumb, key)))
+    .limit(1)
+  return rows[0] ?? null
+}
+
+export async function listPhotosForJourney(journeyId: string) {
+  const db = useDb()
+  return db.select().from(photos).where(eq(photos.journeyId, journeyId)).orderBy(photos.capturedAt)
+}
+
 export async function listPhotosForOwner(journeyId: string, ownerId: string) {
   const db = useDb()
   const rows = await db

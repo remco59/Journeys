@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const filesBase = useFilesBase()
+
 withDefaults(
   defineProps<{
     photos: Array<{
@@ -29,7 +31,7 @@ function onMove(photoId: string, event: Event) {
     >
       <img
         v-if="photo.storageKeyThumb"
-        :src="`/api/files/${encodeURIComponent(photo.storageKeyThumb)}`"
+        :src="`${filesBase}/${encodeURIComponent(photo.storageKeyThumb)}`"
         :alt="photo.capturedAt ?? 'photo'"
         class="h-full w-full object-cover"
         loading="lazy"

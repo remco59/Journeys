@@ -1,11 +1,11 @@
-import { listSectionsForOwner } from '../../../domain/sections/sections'
+import { listSharesForOwner } from '../../../domain/sharing/shares'
 
 export default defineEventHandler(async (event) => {
   const user = requireUser(event)
   const journeyId = getRouterParam(event, 'id')!
-  const sections = await listSectionsForOwner(journeyId, user.id)
-  if (sections === null) {
+  const shares = await listSharesForOwner(journeyId, user.id)
+  if (shares === null) {
     throw createError({ statusCode: 404, statusMessage: 'Journey not found' })
   }
-  return sections
+  return shares
 })

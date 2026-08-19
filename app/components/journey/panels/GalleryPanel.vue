@@ -6,8 +6,8 @@ type Photo = {
   storageKeyPreview: string | null
   capturedAt: string | null
   caption: string | null
-  cameraMake: string | null
-  cameraModel: string | null
+  cameraMake?: string | null
+  cameraModel?: string | null
   locationSource: string
 }
 type Section = { id: string; title: string; placeName: string | null; arrivalAt: string | null }

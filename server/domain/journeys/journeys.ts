@@ -12,6 +12,12 @@ export async function listJourneysForOwner(ownerId: string) {
     .orderBy(journeys.startDate)
 }
 
+export async function getJourneyById(id: string) {
+  const db = useDb()
+  const rows = await db.select().from(journeys).where(eq(journeys.id, id)).limit(1)
+  return rows[0] ?? null
+}
+
 export async function getJourneyForOwner(id: string, ownerId: string) {
   const db = useDb()
   const rows = await db

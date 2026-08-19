@@ -1,6 +1,5 @@
 <script setup lang="ts">
 const props = defineProps<{
-  journeyId: string
   section: {
     id: string
     title: string
@@ -20,6 +19,8 @@ const emit = defineEmits<{
   movePhoto: [photoId: string, sectionId: string]
   locate: []
 }>()
+
+const readonly = useReadonly()
 
 const CONFIDENCE_LABEL: Record<string, string> = {
   high: 'High confidence',
@@ -61,17 +62,17 @@ const managingPhotos = ref(false)
       </span>
     </div>
 
-    <StoryStoryPhotoPreview :journey-id="journeyId" :section-id="section.id" :photos="photos" />
+    <StoryStoryPhotoPreview :section-id="section.id" :photos="photos" />
 
     <PhotoPhotoGrid
-      v-if="managingPhotos"
+      v-if="managingPhotos && !readonly"
       :photos="photos"
       :other-sections="otherSections"
       class="mt-3"
       @move="(photoId: string, sectionId: string) => emit('movePhoto', photoId, sectionId)"
     />
 
-    <div class="mt-4 flex flex-wrap items-center gap-3 border-t border-(--color-line) pt-3 text-sm text-(--color-ink-soft)">
+    <div v-if="!readonly" class="mt-4 flex flex-wrap items-center gap-3 border-t border-(--color-line) pt-3 text-sm text-(--color-ink-soft)">
       <button class="hover:text-(--color-ink)" @click="emit('edit')">Edit</button>
       <button class="hover:text-(--color-ink)" @click="managingPhotos = !managingPhotos">
         {{ managingPhotos ? 'Done' : 'Manage photos' }}

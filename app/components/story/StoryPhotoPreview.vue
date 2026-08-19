@@ -1,20 +1,21 @@
 <script setup lang="ts">
 const props = defineProps<{
-  journeyId: string
   sectionId: string
   photos: Array<{ id: string; storageKeyThumb: string | null; capturedAt: string | null }>
 }>()
 
 const PROMINENT_COUNT = 3
+const linkBase = useLinkBase()
+const filesBase = useFilesBase()
 
 const shown = computed(() => props.photos.slice(0, PROMINENT_COUNT))
 const overflowCount = computed(() => Math.max(0, props.photos.length - PROMINENT_COUNT))
 
 function photoUrl(id: string) {
-  return `/journeys/${props.journeyId}/gallery?photo=${id}`
+  return `${linkBase}/gallery?photo=${id}`
 }
 function sectionUrl() {
-  return `/journeys/${props.journeyId}/gallery?section=${props.sectionId}`
+  return `${linkBase}/gallery?section=${props.sectionId}`
 }
 </script>
 
@@ -28,7 +29,7 @@ function sectionUrl() {
     >
       <img
         v-if="photo.storageKeyThumb"
-        :src="`/api/files/${encodeURIComponent(photo.storageKeyThumb)}`"
+        :src="`${filesBase}/${encodeURIComponent(photo.storageKeyThumb)}`"
         class="h-full w-full object-cover"
         loading="lazy"
         :alt="photo.capturedAt ?? 'photo'"

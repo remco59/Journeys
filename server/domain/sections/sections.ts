@@ -4,21 +4,22 @@ import { sections, journeys, photos } from '../../db/schema'
 import { geoPointSelect } from '../../db/postgis'
 import type { CreateSectionInput, UpdateSectionInput } from '../../../shared/types/sections'
 
-export async function listSectionsForJourney(journeyId: string) {
-  const db = useDb()
-  return db.select().from(sections).where(eq(sections.journeyId, journeyId)).orderBy(sections.orderIndex)
-}
-
 /** Includes lat/lon (projected out of the otherwise write-only geom column) — the Map view needs real coordinates. */
-export async function listSectionsForOwner(journeyId: string, ownerId: string) {
+export async function listSectionsForJourney(journeyId: string) {
   const db = useDb()
   const rows = await db
     .select({ section: sections, ...geoPointSelect(sections.geom) })
     .from(sections)
-    .innerJoin(journeys, eq(sections.journeyId, journeys.id))
-    .where(and(eq(sections.journeyId, journeyId), eq(journeys.ownerId, ownerId)))
+    .where(eq(sections.journeyId, journeyId))
     .orderBy(sections.orderIndex)
   return rows.map((r) => ({ ...r.section, lat: r.lat, lon: r.lon }))
+}
+
+export async function listSectionsForOwner(journeyId: string, ownerId: string) {
+  const db = useDb()
+  const owns = await db.select({ id: journeys.id }).from(journeys).where(and(eq(journeys.id, journeyId), eq(journeys.ownerId, ownerId))).limit(1)
+  if (!owns[0]) return null
+  return listSectionsForJourney(journeyId)
 }
 
 export async function getSectionForOwner(sectionId: string, ownerId: string) {

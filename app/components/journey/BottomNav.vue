@@ -1,5 +1,7 @@
 <script setup lang="ts">
-const props = defineProps<{ journeyId: string; active: 'trip' | 'map' | 'story' | 'gallery' }>()
+const props = defineProps<{ active: 'trip' | 'map' | 'story' | 'gallery' }>()
+
+const linkBase = useLinkBase()
 
 const TABS: Array<{ key: 'trip' | 'map' | 'story' | 'gallery'; label: string }> = [
   { key: 'trip', label: 'Trip' },
@@ -9,7 +11,7 @@ const TABS: Array<{ key: 'trip' | 'map' | 'story' | 'gallery'; label: string }> 
 ]
 
 function pathFor(key: string) {
-  return key === 'trip' ? `/journeys/${props.journeyId}` : `/journeys/${props.journeyId}/${key}`
+  return key === 'trip' ? linkBase : `${linkBase}/${key}`
 }
 </script>
 

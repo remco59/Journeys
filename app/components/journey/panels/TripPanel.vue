@@ -7,10 +7,11 @@ type Section = {
 }
 
 const props = defineProps<{
-  journeyId: string
   sections: Section[]
   photosBySection: Map<string | null, Array<{ id: string }>>
 }>()
+
+const linkBase = useLinkBase()
 
 function photoCount(sectionId: string) {
   return props.photosBySection.get(sectionId)?.length ?? 0
@@ -34,7 +35,7 @@ function arrivalTimeLabel(section: Section) {
       <NuxtLink
         v-for="section in sections"
         :key="section.id"
-        :to="`/journeys/${journeyId}/story`"
+        :to="`${linkBase}/story`"
         class="block rounded-xl border border-(--color-line) bg-(--color-paper-raised) p-4 transition hover:border-(--color-gold)"
       >
         <p class="font-(family-name:--font-display) text-lg font-medium">{{ section.title }}</p>

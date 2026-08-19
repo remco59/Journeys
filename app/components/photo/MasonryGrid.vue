@@ -4,6 +4,7 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{ select: [photoId: string] }>()
+const filesBase = useFilesBase()
 </script>
 
 <template>
@@ -16,7 +17,7 @@ const emit = defineEmits<{ select: [photoId: string] }>()
     >
       <img
         v-if="photo.storageKeyThumb"
-        :src="`/api/files/${encodeURIComponent(photo.storageKeyThumb)}`"
+        :src="`${filesBase}/${encodeURIComponent(photo.storageKeyThumb)}`"
         class="w-full"
         loading="lazy"
         :alt="photo.capturedAt ?? 'photo'"
