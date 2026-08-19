@@ -34,7 +34,7 @@ export async function createJourney(ownerId: string, input: CreateJourneyInput) 
       endDate: input.endDate
     })
     .returning()
-  return row
+  return row! // a single-row insert always returns exactly one row
 }
 
 export async function updateJourney(id: string, ownerId: string, input: UpdateJourneyInput) {

@@ -25,9 +25,15 @@
     "@node-rs/argon2": "^2.0.2",
     "nanoid": "^5.0.9",
     "luxon": "^3.5.0",
-    "graphile-worker": "^0.16.6",
+    "graphile-worker": "^0.17.3",
     "pinia": "^2.3.0",
-    "@pinia/nuxt": "^0.9.0"
+    "@pinia/nuxt": "^0.9.0",
+    "exiftool-vendored": "^37.2.0",
+    "sharp": "^0.35.3",
+    "tz-lookup": "^6.1.25",
+    "@aws-sdk/client-s3": "^3.1113.0",
+    "@aws-sdk/s3-request-presigner": "^3.1113.0",
+    "file-type": "^22.0.2"
   },
   "devDependencies": {
     "typescript": "^5.7.2",
@@ -39,6 +45,7 @@
     "vitest": "^2.1.8",
     "@types/pg": "^8.11.10",
     "@types/luxon": "^3.4.2",
+    "@types/tz-lookup": "^6.1.2",
     "@vue/test-utils": "^2.4.6"
   }
 }

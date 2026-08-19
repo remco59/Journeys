@@ -40,6 +40,8 @@ const durationDays = computed(() => {
   const end = new Date(journey.value.endDate)
   return Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1
 })
+
+const { data: photos, refresh: refreshPhotos } = await useFetch(`/api/journeys/${id}/photos`)
 </script>
 
 <template>
@@ -76,8 +78,10 @@ const durationDays = computed(() => {
       </div>
     </header>
 
-    <main class="mx-auto max-w-4xl px-6 py-10 text-(--color-ink-soft)">
-      <p>Trip, Map, Story and Gallery views land in later phases.</p>
+    <main class="mx-auto max-w-4xl px-6 py-10">
+      <p class="mb-6 text-sm text-(--color-ink-soft)">Trip, Map, Story and Gallery views land in later phases — this is a working photo pipeline preview.</p>
+      <PhotoPhotoUploader :journey-id="id" class="mb-6" @uploaded="refreshPhotos" />
+      <PhotoPhotoGrid :photos="photos ?? []" />
     </main>
   </div>
 </template>

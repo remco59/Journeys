@@ -1,5 +1,6 @@
-import { pgTable, pgEnum, uuid, varchar, text, date, timestamp, index } from 'drizzle-orm/pg-core'
+import { pgTable, pgEnum, uuid, varchar, text, date, timestamp, index, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { users } from './users'
+import { photos } from './photos'
 
 export const journeyVisibilityEnum = pgEnum('journey_visibility', ['private', 'shared'])
 
@@ -12,8 +13,9 @@ export const journeys = pgTable(
     description: text('description'),
     startDate: date('start_date', { mode: 'string' }).notNull(),
     endDate: date('end_date', { mode: 'string' }).notNull(),
-    // No FK yet: photos doesn't exist until Phase 3, which adds the constraint.
-    coverPhotoId: uuid('cover_photo_id'),
+    // Explicit AnyPgColumn return type breaks the journeys<->photos circular
+    // type-inference cycle (both files reference each other's table).
+    coverPhotoId: uuid('cover_photo_id').references((): AnyPgColumn => photos.id, { onDelete: 'set null' }),
     visibility: journeyVisibilityEnum('visibility').notNull().default('private'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()

@@ -31,5 +31,5 @@ export async function createUser(input: CreateUserInput) {
     .insert(users)
     .values({ username: input.username, passwordHash, role: input.role })
     .returning({ id: users.id, username: users.username, role: users.role, createdAt: users.createdAt })
-  return row
+  return row! // a single-row insert always returns exactly one row
 }

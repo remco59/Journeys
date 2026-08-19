@@ -30,6 +30,30 @@ services:
         - action: rebuild
           path: package.json
 
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: dev
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-journeys}:${POSTGRES_PASSWORD:-journeys_dev_password}@postgres:5432/${POSTGRES_DB:-journeys}
+    command: ['npm', 'run', 'worker:dev']
+    volumes:
+      - photos-original:/data/photos
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    develop:
+      watch:
+        - action: sync
+          path: ./server
+          target: /app/server
+        - action: rebuild
+          path: package.json
+
   migrate:
     build:
       context: .
