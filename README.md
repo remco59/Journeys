@@ -9,7 +9,7 @@ A self-hosted app for turning your travel GPS traces and photos into shareable j
 - **Journeys & sections** — organize activities and photos into trips with a map + timeline view
 - **Sharing** — generate share links for journeys
 - **Admin** — user management, bootstrap admin account
-- **Android app** — native Capacitor wrapper with an EXIF-preserving photo picker
+- **Android app** — native Capacitor wrapper with an EXIF-preserving photo picker, chunked background upload with progress notification, and a branded offline screen when the server is unreachable
 
 ## Stack
 
@@ -57,8 +57,12 @@ cp .env.example .env   # set real passwords, APPDATA_PATH, etc.
 docker compose -f compose.prod.yml up -d --build
 ```
 
-Postgres data, uploaded photos, and `.env` are the only state that needs to survive a redeploy or host migration.
+Postgres data, uploaded photos, and `.env` are the only state that needs to survive a redeploy or host migration. To pull the latest source and rebuild/restart the stack in one step on the host, run [docker/update.sh](docker/update.sh).
 
 ## Android app
 
-The `android/` directory is a Capacitor project wrapping the web app. See [capacitor.config.ts](capacitor.config.ts) for configuration.
+The `android/` directory is a Capacitor project wrapping the web app, pointed at the production URL in [capacitor.config.ts](capacitor.config.ts). It adds native functionality on top of the web app:
+
+- An EXIF-preserving photo picker (`PhotoAccessPlugin`, `PhotoPickerActivity`) for selecting photos to geotag and upload
+- A foreground `PhotoUploadService` that chunks and uploads selected photos in the background with a progress notification
+- A branded offline screen (native `offline.html` plus a Vue `OfflineState` fallback) shown instead of the stock browser error page when the server is unreachable, auto-reloading once connectivity returns
