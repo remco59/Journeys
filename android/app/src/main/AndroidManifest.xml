@@ -26,7 +26,18 @@
 
         <activity
             android:name=".PhotoPickerActivity"
-            android:theme="@style/AppTheme"
+            android:theme="@style/AppTheme.PhotoPicker"
+            android:exported="false" />
+
+        <!--
+          dataSync type: keeps the chunked photo upload (PhotoUploadService)
+          running when the app is backgrounded instead of being Doze-killed
+          mid-batch. The ongoing notification it must show is the price
+          Android charges for that background execution grant.
+        -->
+        <service
+            android:name=".PhotoUploadService"
+            android:foregroundServiceType="dataSync"
             android:exported="false" />
 
         <provider
@@ -44,6 +55,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!--
       Deliberately NOT using the system Photo Picker (MediaStore.ACTION_PICK_IMAGES):

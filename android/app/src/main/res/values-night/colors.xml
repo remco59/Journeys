@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mirrors app/assets/css/main.css's [data-theme='dark'] palette. -->
+<resources>
+    <color name="journeys_paper">#171B1F</color>
+    <color name="journeys_paper_raised">#1F252B</color>
+    <color name="journeys_ink">#EDE7D9</color>
+    <color name="journeys_ink_soft">#B8B0A0</color>
+    <color name="journeys_teal">#6EA89F</color>
+    <color name="journeys_teal_deep">#8FC0B7</color>
+    <color name="journeys_cream">#F7F2E6</color>
+    <color name="journeys_stone_line">#A89D8A</color>
+</resources>

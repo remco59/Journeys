@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mirrors app/assets/css/main.css's light palette so native screens (e.g.
+     the photo picker) match the web app's look instead of Capacitor's defaults. -->
+<resources>
+    <color name="colorPrimary">#2E5C58</color>
+    <color name="colorPrimaryDark">#1F433F</color>
+    <color name="colorAccent">#D89B4A</color>
+
+    <color name="journeys_paper">#F7F2E6</color>
+    <color name="journeys_paper_raised">#EFE7D5</color>
+    <color name="journeys_ink">#141A20</color>
+    <color name="journeys_ink_soft">#2B333B</color>
+    <color name="journeys_teal">#2E5C58</color>
+    <color name="journeys_teal_deep">#1F433F</color>
+    <color name="journeys_cream">#FBF7EE</color>
+    <color name="journeys_stone_line">#8C8172</color>
+</resources>

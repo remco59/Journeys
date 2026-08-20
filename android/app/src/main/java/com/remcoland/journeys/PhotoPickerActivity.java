@@ -17,6 +17,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -47,11 +48,14 @@ public class PhotoPickerActivity extends Activity {
   private Button uploadButton;
   private PhotoAdapter adapter;
 
-  // Drag-to-select state: a long-press starts a "paint" gesture (like Google
-  // Photos) where every cell the finger subsequently passes over gets added
-  // to the selection, until the finger lifts.
+  // Drag-to-select state: a long-press anchors a range at the cell it started
+  // on, and every subsequent move recomputes the contiguous range between that
+  // anchor and the finger's current cell (shift-click style), growing or
+  // shrinking live as the finger moves — rather than a "paint" that only adds.
   private boolean dragSelecting = false;
+  private int dragAnchorPosition = -1;
   private int lastDragPosition = -1;
+  private final LinkedHashSet<Integer> dragRangeSelected = new LinkedHashSet<>();
 
   @Override
   protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -80,11 +84,11 @@ public class PhotoPickerActivity extends Activity {
         int position = gridView.pointToPosition((int) e.getX(), (int) e.getY());
         if (position == GridView.INVALID_POSITION) return;
         dragSelecting = true;
+        dragAnchorPosition = position;
         lastDragPosition = position;
-        selectedPositions.add(position);
+        dragRangeSelected.clear();
         gridView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-        adapter.notifyDataSetChanged();
-        updateUploadButton();
+        updateDragRange(position);
       }
     });
 
@@ -100,16 +104,15 @@ public class PhotoPickerActivity extends Activity {
           int position = gridView.pointToPosition((int) event.getX(), (int) event.getY());
           if (position != GridView.INVALID_POSITION && position != lastDragPosition) {
             lastDragPosition = position;
-            if (selectedPositions.add(position)) {
-              adapter.notifyDataSetChanged();
-              updateUploadButton();
-            }
+            updateDragRange(position);
           }
           return true;
         case MotionEvent.ACTION_UP:
         case MotionEvent.ACTION_CANCEL:
           dragSelecting = false;
+          dragAnchorPosition = -1;
           lastDragPosition = -1;
+          dragRangeSelected.clear();
           return true;
         default:
           return true;
@@ -135,6 +138,29 @@ public class PhotoPickerActivity extends Activity {
       finish();
     });
 
+    updateUploadButton();
+  }
+
+  // Recomputes the live drag range [anchor..current] and reconciles it against
+  // selectedPositions: cells that fell out of the range since the last move are
+  // deselected, cells newly covered are selected. Only touches positions this
+  // drag gesture itself added (dragRangeSelected), so it never clobbers
+  // selections made by earlier taps or an earlier, separate drag gesture.
+  private void updateDragRange(int currentPosition) {
+    int lo = Math.min(dragAnchorPosition, currentPosition);
+    int hi = Math.max(dragAnchorPosition, currentPosition);
+    LinkedHashSet<Integer> newRange = new LinkedHashSet<>();
+    for (int p = lo; p <= hi; p++) newRange.add(p);
+
+    for (Integer p : dragRangeSelected) {
+      if (!newRange.contains(p)) selectedPositions.remove(p);
+    }
+    selectedPositions.addAll(newRange);
+
+    dragRangeSelected.clear();
+    dragRangeSelected.addAll(newRange);
+
+    adapter.notifyDataSetChanged();
     updateUploadButton();
   }
 
@@ -192,7 +218,17 @@ public class PhotoPickerActivity extends Activity {
       }
       ImageView thumbnail = view.findViewById(R.id.thumbnail);
       TextView badge = view.findViewById(R.id.selectedBadge);
-      badge.setVisibility(selectedPositions.contains(position) ? View.VISIBLE : View.GONE);
+      boolean selected = selectedPositions.contains(position);
+      badge.setVisibility(selected ? View.VISIBLE : View.GONE);
+
+      // Inset the thumbnail within its cell when selected, so the reserved space
+      // reads as a shrink-with-whitespace cue instead of just the checkmark badge.
+      int insetPx = selected ? dpToPx(8) : 0;
+      FrameLayout.LayoutParams thumbLp = (FrameLayout.LayoutParams) thumbnail.getLayoutParams();
+      if (thumbLp.leftMargin != insetPx) {
+        thumbLp.setMargins(insetPx, insetPx, insetPx, insetPx);
+        thumbnail.setLayoutParams(thumbLp);
+      }
 
       Uri uri = allUris.get(position);
       if (!uri.equals(thumbnail.getTag())) {

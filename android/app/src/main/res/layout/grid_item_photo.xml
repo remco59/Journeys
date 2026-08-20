@@ -16,7 +16,7 @@
         android:layout_height="24dp"
         android:layout_gravity="top|end"
         android:layout_margin="4dp"
-        android:background="@android:drawable/presence_online"
+        android:background="@drawable/ic_selected_badge"
         android:visibility="gone" />
 
 </FrameLayout>
