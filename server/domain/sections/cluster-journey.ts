@@ -24,14 +24,28 @@ async function fetchClusterablePhotos(journeyId: string): Promise<ClusterPoint[]
     .map((r) => ({ id: r.id, lat: r.lat!, lon: r.lon!, timestamp: r.capturedAt!.getTime() }))
 }
 
+// How close a location-less photo's capture time must be to a section's
+// nearest member photo (its arrivalAt/departureAt edge) to count as "taken
+// around the same time" when it falls outside the section's own span.
+const UNLOCATED_PHOTO_TIME_TOLERANCE_MS = 10 * 60 * 1000
+
+/** 0 when capturedMs falls inside [arrivalAt, departureAt]; otherwise the gap to the nearest edge. */
+function timeDistanceToSectionMs(capturedMs: number, arrivalMs: number, departureMs: number): number {
+  if (capturedMs < arrivalMs) return arrivalMs - capturedMs
+  if (capturedMs > departureMs) return capturedMs - departureMs
+  return 0
+}
+
 /**
  * Photos with no resolvable GPS never produce a cluster point, so they'd
  * otherwise sit unsorted forever. Once every geotagged photo has settled
- * into a section (this runs after that loop), a location-less photo whose
- * capture time falls inside one section's [arrivalAt, departureAt] span —
- * i.e. it was taken between that section's own photos — is placed there
- * too. A photo matching no section's time span, or matching more than one
- * (ambiguous), is left unsorted rather than guessed at.
+ * into a section (this runs after that loop), a location-less photo is
+ * matched to a section by capture time: it either falls inside that
+ * section's [arrivalAt, departureAt] span, or lands within
+ * UNLOCATED_PHOTO_TIME_TOLERANCE_MS of one of that span's edges — i.e. it
+ * was taken right around another photo already in that section. When more
+ * than one section is within range, the closest one by that time gap wins.
+ * A photo matching no section at all is left unsorted rather than guessed at.
  */
 async function assignUnlocatedPhotosByTime(journeyId: string): Promise<number> {
   const db = useDb()
@@ -55,9 +69,14 @@ async function assignUnlocatedPhotosByTime(journeyId: string): Promise<number> {
   let photosAssigned = 0
   for (const photo of candidates) {
     const capturedMs = photo.capturedAt!.getTime()
-    const matches = timedSections.filter((s) => capturedMs >= s.arrivalAt.getTime() && capturedMs <= s.departureAt.getTime())
-    if (matches.length !== 1) continue // no fit, or ambiguous overlap — leave unsorted
-    await db.update(photos).set({ sectionId: matches[0]!.id }).where(eq(photos.id, photo.id))
+    let closest: { id: string; distanceMs: number } | null = null
+    for (const s of timedSections) {
+      const distanceMs = timeDistanceToSectionMs(capturedMs, s.arrivalAt.getTime(), s.departureAt.getTime())
+      if (distanceMs > UNLOCATED_PHOTO_TIME_TOLERANCE_MS) continue
+      if (!closest || distanceMs < closest.distanceMs) closest = { id: s.id, distanceMs }
+    }
+    if (!closest) continue
+    await db.update(photos).set({ sectionId: closest.id }).where(eq(photos.id, photo.id))
     photosAssigned++
   }
   return photosAssigned
