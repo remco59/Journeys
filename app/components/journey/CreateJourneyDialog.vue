@@ -21,11 +21,16 @@ function open() {
   endDate.value = ''
   createdJourneyId.value = null
   uploadedCount.value = 0
+  guard.reset()
   dialog.value?.showModal()
 }
 function close() {
   dialog.value?.close()
 }
+// Once the journey is created (step 'photos'), it's already persisted — closing
+// doesn't lose anything, so only the 'details' step needs the unsaved-changes guard.
+const isDirty = () => step.value === 'details' && !!(title.value || description.value || startDate.value || endDate.value)
+const guard = useCloseGuard(isDirty, close)
 defineExpose({ open })
 
 async function onSubmitDetails() {
@@ -63,7 +68,7 @@ async function finish() {
 </script>
 
 <template>
-  <dialog ref="dialog" class="sheet">
+  <dialog ref="dialog" class="sheet" @click.self="guard.requestClose" @cancel.prevent="guard.requestClose">
     <div class="sheet-handle" />
     <form v-if="step === 'details'" class="flex flex-col gap-3 p-6 pt-2" @submit.prevent="onSubmitDetails">
       <h2 class="font-(family-name:--font-display) text-xl font-medium">New journey</h2>
@@ -93,7 +98,7 @@ async function finish() {
       <p v-if="error" class="text-sm text-(--color-brick)">{{ error }}</p>
 
       <div class="mt-2 flex justify-end gap-2">
-        <button type="button" class="rounded-lg px-3 py-2 text-sm text-(--color-ink-soft)" @click="close">Cancel</button>
+        <button type="button" class="rounded-lg px-3 py-2 text-sm text-(--color-ink-soft)" @click="guard.requestClose">Cancel</button>
         <button type="submit" :disabled="submitting" class="btn-primary">
           {{ submitting ? 'Creating…' : 'Next: add photos' }}
         </button>
@@ -115,5 +120,6 @@ async function finish() {
         <button type="button" class="btn-primary" @click="finish">Go to journey</button>
       </div>
     </div>
+    <UnsavedChangesGuard :show="guard.confirmingClose.value" @keep="guard.cancelClose" @discard="guard.discardAndClose" />
   </dialog>
 </template>

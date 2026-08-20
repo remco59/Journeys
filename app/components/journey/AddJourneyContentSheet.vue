@@ -28,11 +28,18 @@ function open(initial?: Exclude<Mode, null>) {
   mode.value = initial ?? null
   reclusterMessage.value = null
   if (mode.value === 'section') resetSectionForm()
+  guard.reset()
   dialog.value?.showModal()
 }
 function close() {
   dialog.value?.close()
 }
+// Only the "create section" form holds user input that isn't already saved —
+// photo/activity/timeline uploads apply as soon as a file is picked.
+const isDirty = () =>
+  mode.value === 'section' &&
+  (!!sectionTitle.value || !!sectionPlace.value || selectedPhotoIds.value.size > 0 || !!sectionDateLocal.value || !!sectionPoint.value)
+const guard = useCloseGuard(isDirty, close)
 defineExpose({ open })
 
 function select(m: (typeof OPTIONS)[number]['mode']) {
@@ -117,13 +124,13 @@ async function createSection() {
 </script>
 
 <template>
-  <dialog ref="dialog" class="sheet" @close="mode = null" @click.self="close">
+  <dialog ref="dialog" class="sheet" @close="mode = null" @click.self="guard.requestClose" @cancel.prevent="guard.requestClose">
     <div class="sheet-handle" />
 
     <div v-if="!mode" class="flex flex-col gap-3 p-6 pt-2">
       <div class="flex items-center justify-between">
         <h2 class="font-(family-name:--font-display) text-xl font-medium">Add to your journey</h2>
-        <button type="button" class="text-(--color-ink-soft) hover:text-(--color-ink)" @click="close">✕</button>
+        <button type="button" class="text-(--color-ink-soft) hover:text-(--color-ink)" @click="guard.requestClose">✕</button>
       </div>
       <p v-if="reclusterMessage" class="animate-fade-up text-sm text-(--color-teal)">{{ reclusterMessage }}</p>
       <button
@@ -145,7 +152,7 @@ async function createSection() {
     <div v-else class="flex flex-col gap-3 p-6 pt-2">
       <div class="flex items-center justify-between">
         <button type="button" class="text-sm text-(--color-ink-soft) hover:text-(--color-ink)" @click="mode = null">‹ Back</button>
-        <button type="button" class="text-(--color-ink-soft) hover:text-(--color-ink)" @click="close">✕</button>
+        <button type="button" class="text-(--color-ink-soft) hover:text-(--color-ink)" @click="guard.requestClose">✕</button>
       </div>
 
       <PhotoUploader v-if="mode === 'photos'" :journey-id="journeyId" @uploaded="onUploaded" />
@@ -219,5 +226,6 @@ async function createSection() {
         <button type="submit" :disabled="sectionSubmitting || !canSubmitSection" class="btn-primary self-end">{{ sectionSubmitting ? 'Creating…' : 'Create' }}</button>
       </form>
     </div>
+    <UnsavedChangesGuard :show="guard.confirmingClose.value" @keep="guard.cancelClose" @discard="guard.discardAndClose" />
   </dialog>
 </template>

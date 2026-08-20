@@ -9,7 +9,10 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.util.Size;
+import android.view.GestureDetector;
+import android.view.HapticFeedbackConstants;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
@@ -44,6 +47,12 @@ public class PhotoPickerActivity extends Activity {
   private Button uploadButton;
   private PhotoAdapter adapter;
 
+  // Drag-to-select state: a long-press starts a "paint" gesture (like Google
+  // Photos) where every cell the finger subsequently passes over gets added
+  // to the selection, until the finger lifts.
+  private boolean dragSelecting = false;
+  private int lastDragPosition = -1;
+
   @Override
   protected void onCreate(@Nullable Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
@@ -63,6 +72,48 @@ public class PhotoPickerActivity extends Activity {
       }
       adapter.notifyDataSetChanged();
       updateUploadButton();
+    });
+
+    GestureDetector longPressDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+      @Override
+      public void onLongPress(MotionEvent e) {
+        int position = gridView.pointToPosition((int) e.getX(), (int) e.getY());
+        if (position == GridView.INVALID_POSITION) return;
+        dragSelecting = true;
+        lastDragPosition = position;
+        selectedPositions.add(position);
+        gridView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+        adapter.notifyDataSetChanged();
+        updateUploadButton();
+      }
+    });
+
+    gridView.setOnTouchListener((v, event) -> {
+      longPressDetector.onTouchEvent(event);
+
+      if (!dragSelecting) {
+        return false;
+      }
+
+      switch (event.getActionMasked()) {
+        case MotionEvent.ACTION_MOVE:
+          int position = gridView.pointToPosition((int) event.getX(), (int) event.getY());
+          if (position != GridView.INVALID_POSITION && position != lastDragPosition) {
+            lastDragPosition = position;
+            if (selectedPositions.add(position)) {
+              adapter.notifyDataSetChanged();
+              updateUploadButton();
+            }
+          }
+          return true;
+        case MotionEvent.ACTION_UP:
+        case MotionEvent.ACTION_CANCEL:
+          dragSelecting = false;
+          lastDragPosition = -1;
+          return true;
+        default:
+          return true;
+      }
     });
 
     cancelButton.setOnClickListener(v -> {
@@ -144,17 +195,23 @@ public class PhotoPickerActivity extends Activity {
       badge.setVisibility(selectedPositions.contains(position) ? View.VISIBLE : View.GONE);
 
       Uri uri = allUris.get(position);
-      thumbnail.setTag(uri);
-      thumbnail.setImageBitmap(null);
+      if (!uri.equals(thumbnail.getTag())) {
+        // Only reset/re-decode when this recycled view is being repurposed for a
+        // different photo. Without this check, every notifyDataSetChanged() (e.g.
+        // toggling one item's selection) blanks and re-decodes every visible
+        // thumbnail, causing a full-grid flash.
+        thumbnail.setTag(uri);
+        thumbnail.setImageBitmap(null);
 
-      thumbExecutor.execute(() -> {
-        Bitmap bitmap = loadThumbnail(uri);
-        runOnUiThread(() -> {
-          if (uri.equals(thumbnail.getTag()) && bitmap != null) {
-            thumbnail.setImageBitmap(bitmap);
-          }
+        thumbExecutor.execute(() -> {
+          Bitmap bitmap = loadThumbnail(uri);
+          runOnUiThread(() -> {
+            if (uri.equals(thumbnail.getTag()) && bitmap != null) {
+              thumbnail.setImageBitmap(bitmap);
+            }
+          });
         });
-      });
+      }
 
       return view;
     }

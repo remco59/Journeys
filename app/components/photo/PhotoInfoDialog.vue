@@ -78,7 +78,7 @@ const locationSourceLabel = computed(() => (photo.value ? (LOCATION_SOURCE_LABEL
 </script>
 
 <template>
-  <dialog ref="dialog" class="sheet">
+  <dialog ref="dialog" class="sheet" @click.self="close">
     <div class="sheet-handle" />
     <div class="flex flex-col gap-4 p-6 pt-2">
       <div class="flex items-center justify-between">

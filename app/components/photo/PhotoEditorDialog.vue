@@ -26,6 +26,14 @@ function toDatetimeLocal(iso: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+const original = ref({ caption: '', capturedAtLocal: '', point: null as { lat: number; lon: number } | null, sectionId: '' as string | '' })
+const isDirty = () =>
+  caption.value !== original.value.caption ||
+  capturedAtLocal.value !== original.value.capturedAtLocal ||
+  point.value?.lat !== original.value.point?.lat ||
+  point.value?.lon !== original.value.point?.lon ||
+  sectionId.value !== original.value.sectionId
+
 function open(p: Photo, currentPoint: { lat: number; lon: number } | null) {
   error.value = null
   photo.value = p
@@ -33,11 +41,14 @@ function open(p: Photo, currentPoint: { lat: number; lon: number } | null) {
   capturedAtLocal.value = toDatetimeLocal(p.capturedAt)
   point.value = currentPoint
   sectionId.value = p.sectionId ?? ''
+  original.value = { caption: caption.value, capturedAtLocal: capturedAtLocal.value, point: currentPoint, sectionId: sectionId.value }
+  guard.reset()
   dialog.value?.showModal()
 }
 function close() {
   dialog.value?.close()
 }
+const guard = useCloseGuard(isDirty, close)
 defineExpose({ open })
 
 async function onSubmit() {
@@ -80,12 +91,12 @@ async function onDelete() {
 </script>
 
 <template>
-  <dialog ref="dialog" class="sheet">
+  <dialog ref="dialog" class="sheet" @click.self="guard.requestClose" @cancel.prevent="guard.requestClose">
     <div class="sheet-handle" />
     <form v-if="photo" class="flex flex-col gap-3 p-6 pt-2" @submit.prevent="onSubmit">
       <div class="flex items-center justify-between">
         <h2 class="font-(family-name:--font-display) text-xl font-medium">Edit photo</h2>
-        <button type="button" class="text-(--color-ink-soft) hover:text-(--color-ink)" @click="close">✕</button>
+        <button type="button" class="text-(--color-ink-soft) hover:text-(--color-ink)" @click="guard.requestClose">✕</button>
       </div>
 
       <label class="flex flex-col gap-1 text-sm">
@@ -122,12 +133,13 @@ async function onDelete() {
           <button type="button" class="text-(--color-brick) hover:opacity-75" @click="onDelete">Delete</button>
         </div>
         <div class="flex gap-2">
-          <button type="button" class="rounded-lg px-3 py-2 text-sm text-(--color-ink-soft)" @click="close">Cancel</button>
+          <button type="button" class="rounded-lg px-3 py-2 text-sm text-(--color-ink-soft)" @click="guard.requestClose">Cancel</button>
           <button type="submit" :disabled="submitting" class="btn-primary">
             {{ submitting ? 'Saving…' : 'Save' }}
           </button>
         </div>
       </div>
     </form>
+    <UnsavedChangesGuard :show="guard.confirmingClose.value" @keep="guard.cancelClose" @discard="guard.discardAndClose" />
   </dialog>
 </template>

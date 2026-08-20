@@ -15,10 +15,13 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * Bridges the web app's photo upload flow to a native picker that reads
@@ -32,6 +35,14 @@ import java.util.concurrent.Executors;
 public class PhotoAccessPlugin extends Plugin {
 
   private static final int PERMISSION_REQUEST_CODE = 9821;
+  // Uploading the whole selection as one request over one connection was the source
+  // of "broken pipe" failures on larger batches: originals are large/uncompressed,
+  // so one connection could stay open for minutes, long enough to hit server/proxy
+  // idle timeouts or get killed by Doze if the app was backgrounded mid-upload.
+  // Splitting into small chunks keeps each connection short-lived and lets earlier
+  // chunks survive even if a later one fails.
+  private static final int CHUNK_SIZE = 5;
+  private static final int MAX_RETRIES_PER_CHUNK = 1;
   private final ExecutorService uploadExecutor = Executors.newSingleThreadExecutor();
 
   private String[] requiredPermissions() {
@@ -123,15 +134,64 @@ public class PhotoAccessPlugin extends Plugin {
 
     uploadExecutor.execute(() -> {
       try {
-        MultipartUploader.Result uploadResult = MultipartUploader.upload(getContext(), uploadUrl, uris, filenames);
-        if (uploadResult.statusCode >= 200 && uploadResult.statusCode < 300) {
-          call.resolve(new JSObject(uploadResult.body));
-        } else {
-          call.reject("Upload failed with status " + uploadResult.statusCode + ": " + uploadResult.body);
+        String importId = null;
+        JSONArray allFiles = new JSONArray();
+
+        for (int start = 0; start < uris.size(); start += CHUNK_SIZE) {
+          int end = Math.min(start + CHUNK_SIZE, uris.size());
+          List<Uri> chunkUris = uris.subList(start, end);
+          List<String> chunkNames = filenames.subList(start, end);
+
+          MultipartUploader.Result chunkResult = uploadChunkWithRetry(uploadUrl, chunkUris, chunkNames);
+          if (chunkResult != null && chunkResult.statusCode >= 200 && chunkResult.statusCode < 300) {
+            JSONObject chunkJson = new JSONObject(chunkResult.body);
+            if (importId == null) importId = chunkJson.optString("importId", null);
+            JSONArray chunkFiles = chunkJson.optJSONArray("files");
+            if (chunkFiles != null) {
+              for (int i = 0; i < chunkFiles.length(); i++) {
+                allFiles.put(chunkFiles.get(i));
+              }
+            }
+          } else {
+            String reason = chunkResult != null
+              ? ("Upload failed with status " + chunkResult.statusCode)
+              : "Network error";
+            for (String name : chunkNames) {
+              JSONObject failed = new JSONObject();
+              failed.put("filename", name);
+              failed.put("status", "rejected");
+              failed.put("reason", reason);
+              allFiles.put(failed);
+            }
+          }
         }
+
+        JSONObject response = new JSONObject();
+        response.put("importId", importId);
+        response.put("files", allFiles);
+        call.resolve(new JSObject(response.toString()));
       } catch (Exception e) {
         call.reject("Upload failed: " + e.getMessage(), e);
       }
     });
+  }
+
+  private MultipartUploader.Result uploadChunkWithRetry(String uploadUrl, List<Uri> chunkUris, List<String> chunkNames) {
+    for (int attempt = 0; attempt <= MAX_RETRIES_PER_CHUNK; attempt++) {
+      try {
+        return MultipartUploader.upload(getContext(), uploadUrl, chunkUris, chunkNames);
+      } catch (IOException e) {
+        if (attempt >= MAX_RETRIES_PER_CHUNK) {
+          return null;
+        }
+        try {
+          Thread.sleep(1000);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          return null;
+        }
+      }
+    }
+    return null;
   }
 }

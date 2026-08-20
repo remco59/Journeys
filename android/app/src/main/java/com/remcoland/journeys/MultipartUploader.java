@@ -43,6 +43,10 @@ class MultipartUploader {
     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
     conn.setDoOutput(true);
     conn.setChunkedStreamingMode(0);
+    conn.setConnectTimeout(15_000);
+    // Applies per read/write stall, not to total transfer time, so it won't cut off
+    // a slow-but-active upload — only one that's gone genuinely dead mid-request.
+    conn.setReadTimeout(30_000);
     conn.setRequestMethod("POST");
     conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
 

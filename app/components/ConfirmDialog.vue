@@ -26,7 +26,7 @@ defineExpose({ open, close })
 </script>
 
 <template>
-  <dialog ref="dialog" class="sheet">
+  <dialog ref="dialog" class="sheet" @click.self="close">
     <div class="sheet-handle" />
     <div class="flex flex-col gap-3 p-6 pt-2">
       <h2 class="font-(family-name:--font-display) text-xl font-medium">{{ title }}</h2>

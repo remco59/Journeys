@@ -45,7 +45,7 @@ async function choose(photoId: string) {
     <button class="btn-chip shrink-0" @click="open">Change</button>
   </div>
 
-  <dialog ref="dialog" class="sheet">
+  <dialog ref="dialog" class="sheet" @click.self="close">
     <div class="sheet-handle" />
     <div class="flex max-h-[75vh] flex-col gap-3 overflow-y-auto p-6 pt-2">
       <div class="flex items-center justify-between">
