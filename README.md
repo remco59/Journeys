@@ -50,14 +50,48 @@ npm run db:generate # generate a new Drizzle migration from schema changes
 
 ## Production deployment
 
-See the header comment in [compose.prod.yml](compose.prod.yml). Broadly:
+Requires Docker and Docker Compose on the host (e.g. Unraid, or any Linux box).
+
+1. **Clone the repo** on the host:
+
+   ```bash
+   git clone https://github.com/remco59/Journeys.git
+   cd Journeys
+   ```
+
+2. **Create and edit `.env`**:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   At minimum, set real values for:
+   - `POSTGRES_PASSWORD` — database password
+   - `BOOTSTRAP_ADMIN_USERNAME` / `BOOTSTRAP_ADMIN_PASSWORD` — credentials for the admin account created automatically on first boot (see step 4)
+   - `APPDATA_PATH` — host path for persistent data, e.g. `/mnt/user/appdata/journeys` on Unraid (defaults to `./data` if unset)
+   - `WEB_PORT` — host port to publish the app on (defaults to `3000`)
+
+   Leave the geocoding/routing/tile provider URLs as-is unless you want to point at your own instances.
+
+3. **Build and start the stack**:
+
+   ```bash
+   docker compose -f compose.prod.yml up -d --build
+   ```
+
+   This builds the `web` and `worker` images, runs database migrations (`migrate`), and starts Postgres, the app, and the background worker. First boot takes a minute or two while images build and the app becomes healthy.
+
+4. **Sign in for the first time**: open `http://<host>:<WEB_PORT>` in a browser and log in with the `BOOTSTRAP_ADMIN_USERNAME` / `BOOTSTRAP_ADMIN_PASSWORD` you set in `.env`. This account is created once, automatically, the first time the app boots with no existing users — it won't be recreated or reset on later restarts. Change the password from the settings page after logging in.
+
+Postgres data, uploaded photos, and `.env` are the only state that needs to survive a redeploy or host migration.
+
+To update later, pull the latest source and rebuild/restart the stack in one step:
 
 ```bash
-cp .env.example .env   # set real passwords, APPDATA_PATH, etc.
-docker compose -f compose.prod.yml up -d --build
+./docker/update.sh
 ```
 
-Postgres data, uploaded photos, and `.env` are the only state that needs to survive a redeploy or host migration. To pull the latest source and rebuild/restart the stack in one step on the host, run [docker/update.sh](docker/update.sh).
+(equivalent to `git pull && docker compose -f compose.prod.yml up -d --build`, run from the repo root on the host).
 
 ## Android app
 
