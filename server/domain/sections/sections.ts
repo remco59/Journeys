@@ -11,7 +11,7 @@ export async function listSectionsForJourney(journeyId: string) {
     .select({ section: sections, ...geoPointSelect(sections.geom) })
     .from(sections)
     .where(eq(sections.journeyId, journeyId))
-    .orderBy(sections.orderIndex)
+    .orderBy(sections.arrivalAt)
   return rows.map((r) => ({ ...r.section, lat: r.lat, lon: r.lon }))
 }
 
@@ -33,26 +33,63 @@ export async function getSectionForOwner(sectionId: string, ownerId: string) {
   return rows[0]?.section ?? null
 }
 
-export async function reindexSectionOrder(journeyId: string): Promise<void> {
-  const db = useDb()
-  const all = await db
-    .select({ id: sections.id })
-    .from(sections)
-    .where(eq(sections.journeyId, journeyId))
-    .orderBy(sections.arrivalAt)
-  for (let i = 0; i < all.length; i++) {
-    await db.update(sections).set({ orderIndex: i }).where(eq(sections.id, all[i]!.id))
+/** Derives a section's arrival/departure/location from a set of photos — min/max capture time, centroid of their points. Shared by createSection's photo-seeded path and splitSection. */
+async function deriveFromPhotos(photoRows: Array<{ capturedAt: Date | null; lat?: number | null; lon?: number | null }>) {
+  const timestamps = photoRows.map((p) => p.capturedAt?.getTime()).filter((t): t is number => t != null)
+  const points = photoRows.filter((p): p is { capturedAt: Date | null; lat: number; lon: number } => p.lat != null && p.lon != null)
+  return {
+    arrivalAt: timestamps.length ? new Date(Math.min(...timestamps)) : null,
+    departureAt: timestamps.length ? new Date(Math.max(...timestamps)) : null,
+    geom: points.length
+      ? { lat: points.reduce((s, p) => s + p.lat, 0) / points.length, lon: points.reduce((s, p) => s + p.lon, 0) / points.length }
+      : null
   }
 }
 
 /** Every field the caller actually supplied becomes both the new value AND a locked field. */
 export async function createSection(journeyId: string, input: CreateSectionInput) {
   const db = useDb()
+
+  if (input.photoIds?.length) {
+    const candidates = await db
+      .select({ id: photos.id, capturedAt: photos.capturedAt, sectionId: photos.sectionId, lockedFields: photos.lockedFields, ...geoPointSelect(photos.geom) })
+      .from(photos)
+      .where(eq(photos.journeyId, journeyId))
+    const selected = candidates.filter((p) => input.photoIds!.includes(p.id) && p.sectionId === null)
+    if (selected.length === 0) {
+      throw new Error('None of the given photoIds are unsorted photos in this journey')
+    }
+    const derived = await deriveFromPhotos(selected)
+
+    const [created] = await db
+      .insert(sections)
+      .values({
+        journeyId,
+        title: input.title,
+        placeName: input.placeName ?? null,
+        description: input.description ?? null,
+        geom: derived.geom,
+        arrivalAt: derived.arrivalAt!,
+        departureAt: derived.departureAt,
+        confidence: 'high',
+        source: 'user_override',
+        lockedFields: ['title', 'placeName', 'description', 'arrivalAt', 'departureAt', 'geom']
+      })
+      .returning()
+
+    for (const photo of selected) {
+      const locks = new Set(photo.lockedFields)
+      locks.add('sectionId')
+      await db.update(photos).set({ sectionId: created!.id, source: 'user_override', lockedFields: [...locks] }).where(eq(photos.id, photo.id))
+    }
+    return created!
+  }
+
   const lockedFields: string[] = ['title']
   if (input.placeName !== undefined) lockedFields.push('placeName')
   if (input.description !== undefined) lockedFields.push('description')
   if (input.lat !== undefined && input.lon !== undefined) lockedFields.push('geom')
-  if (input.arrivalAt !== undefined) lockedFields.push('arrivalAt')
+  lockedFields.push('arrivalAt')
   if (input.departureAt !== undefined) lockedFields.push('departureAt')
 
   const [created] = await db
@@ -63,7 +100,7 @@ export async function createSection(journeyId: string, input: CreateSectionInput
       placeName: input.placeName ?? null,
       description: input.description ?? null,
       geom: input.lat !== undefined && input.lon !== undefined ? { lat: input.lat, lon: input.lon } : null,
-      arrivalAt: input.arrivalAt ? new Date(input.arrivalAt) : null,
+      arrivalAt: new Date(input.arrivalAt!),
       departureAt: input.departureAt ? new Date(input.departureAt) : null,
       confidence: 'high',
       source: 'user_override',
@@ -71,7 +108,6 @@ export async function createSection(journeyId: string, input: CreateSectionInput
     })
     .returning()
 
-  await reindexSectionOrder(journeyId)
   return created!
 }
 
@@ -97,7 +133,7 @@ export async function updateSectionFields(section: typeof sections.$inferSelect,
     newLocks.add('geom')
   }
   if (input.arrivalAt !== undefined) {
-    patch.arrivalAt = input.arrivalAt ? new Date(input.arrivalAt) : null
+    patch.arrivalAt = new Date(input.arrivalAt)
     newLocks.add('arrivalAt')
   }
   if (input.departureAt !== undefined) {
@@ -110,34 +146,45 @@ export async function updateSectionFields(section: typeof sections.$inferSelect,
   patch.updatedAt = new Date()
 
   const [updated] = await db.update(sections).set(patch).where(eq(sections.id, section.id)).returning()
-
-  if (input.arrivalAt !== undefined) {
-    await reindexSectionOrder(section.journeyId)
-  }
   return updated!
 }
 
-/** Manual drag-reorder from the editor. Overrides the arrival-time ordering until the next structural change (create/delete/merge/split) or arrival-time edit reindexes the journey. */
+/**
+ * Manual drag-reorder from the editor. Ordering has one source of truth
+ * (arrivalAt), so "reorder" means reassigning the journey's existing
+ * (arrivalAt, departureAt) pairs — sorted ascending — to the requested
+ * section order, one pair per position. Real timestamps stay real, just
+ * relabeled, and the result sorts back into exactly the requested order.
+ */
 export async function reorderSections(journeyId: string, orderedIds: string[]) {
   const db = useDb()
-  const existing = await db.select({ id: sections.id }).from(sections).where(eq(sections.journeyId, journeyId))
+  const existing = await db
+    .select({ id: sections.id, arrivalAt: sections.arrivalAt, departureAt: sections.departureAt, lockedFields: sections.lockedFields })
+    .from(sections)
+    .where(eq(sections.journeyId, journeyId))
+    .orderBy(sections.arrivalAt)
   const existingIds = new Set(existing.map((s) => s.id))
   if (orderedIds.length !== existingIds.size || orderedIds.some((id) => !existingIds.has(id))) {
     throw new Error('orderedIds must be exactly the set of section ids in this journey')
   }
+  const byId = new Map(existing.map((s) => [s.id, s]))
   for (let i = 0; i < orderedIds.length; i++) {
-    await db.update(sections).set({ orderIndex: i }).where(eq(sections.id, orderedIds[i]!))
+    const id = orderedIds[i]!
+    const slot = existing[i]!
+    const locks = new Set(byId.get(id)!.lockedFields)
+    locks.add('arrivalAt')
+    locks.add('departureAt')
+    await db.update(sections).set({ arrivalAt: slot.arrivalAt, departureAt: slot.departureAt, source: 'user_override', lockedFields: [...locks] }).where(eq(sections.id, id))
   }
 }
 
-export async function deleteSection(sectionId: string, journeyId: string) {
+export async function deleteSection(sectionId: string) {
   const db = useDb()
   // photos.sectionId has onDelete: 'set null' — member photos become unsorted, not deleted.
   await db.delete(sections).where(eq(sections.id, sectionId))
-  await reindexSectionOrder(journeyId)
 }
 
-export async function mergeSections(sourceId: string, targetId: string, journeyId: string) {
+export async function mergeSections(sourceId: string, targetId: string) {
   const db = useDb()
   const memberPhotos = await db.select({ id: photos.id, lockedFields: photos.lockedFields }).from(photos).where(eq(photos.sectionId, sourceId))
 
@@ -148,7 +195,6 @@ export async function mergeSections(sourceId: string, targetId: string, journeyI
   }
 
   await db.delete(sections).where(eq(sections.id, sourceId))
-  await reindexSectionOrder(journeyId)
   return { movedPhotos: memberPhotos.length }
 }
 
@@ -191,6 +237,5 @@ export async function splitSection(source: typeof sections.$inferSelect, photoId
     await db.update(photos).set({ sectionId: created!.id, source: 'user_override', lockedFields: [...locks] }).where(eq(photos.id, photo.id))
   }
 
-  await reindexSectionOrder(source.journeyId)
   return created!
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "photos" ADD COLUMN "show_in_story" boolean DEFAULT false NOT NULL;

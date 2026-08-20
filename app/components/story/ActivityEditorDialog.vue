@@ -1,16 +1,20 @@
 <script setup lang="ts">
+type Photo = { id: string; storageKeyThumb: string | null }
 type Activity = {
   id: string
   title: string
   type: 'cycling' | 'hiking' | 'running' | 'walking' | 'swimming' | 'other'
+  coverPhotoId?: string | null
 }
 
-const emit = defineEmits<{ saved: []; deleted: [] }>()
+const props = defineProps<{ journeyId: string; photos: Photo[] }>()
+const emit = defineEmits<{ saved: []; deleted: []; refreshPhotos: [] }>()
 
 const dialog = ref<HTMLDialogElement | null>(null)
 const activity = ref<Activity | null>(null)
 const title = ref('')
 const type = ref<Activity['type']>('other')
+const coverPhotoId = ref<string | null>(null)
 const error = ref<string | null>(null)
 const submitting = ref(false)
 
@@ -19,6 +23,7 @@ function open(a: Activity) {
   activity.value = a
   title.value = a.title
   type.value = a.type
+  coverPhotoId.value = a.coverPhotoId ?? null
   dialog.value?.showModal()
 }
 function close() {
@@ -31,7 +36,10 @@ async function onSubmit() {
   error.value = null
   submitting.value = true
   try {
-    await $fetch(`/api/activities/${activity.value.id}`, { method: 'PATCH', body: { title: title.value, type: type.value } })
+    await $fetch(`/api/activities/${activity.value.id}`, {
+      method: 'PATCH',
+      body: { title: title.value, type: type.value, coverPhotoId: coverPhotoId.value }
+    })
     close()
     emit('saved')
   } catch (err: any) {
@@ -72,6 +80,17 @@ async function onDelete() {
           <option value="other">Other</option>
         </select>
       </label>
+
+      <div class="flex flex-col gap-1 text-sm">
+        Cover photo
+        <PhotoPicker
+          :journey-id="journeyId"
+          :photos="photos"
+          :selected-id="coverPhotoId"
+          @update:selected-id="coverPhotoId = $event"
+          @uploaded="emit('refreshPhotos')"
+        />
+      </div>
 
       <p v-if="error" class="text-sm text-(--color-brick)">{{ error }}</p>
 

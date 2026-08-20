@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, integer, timestamp, index } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, varchar, text, timestamp, index } from 'drizzle-orm/pg-core'
 import { journeys } from './journeys'
 import { provenanceEnum, confidenceEnum } from './enums'
 import { geometryPoint } from '../postgis'
@@ -12,9 +12,8 @@ export const sections = pgTable(
     placeName: varchar('place_name', { length: 300 }),
     description: text('description'),
     geom: geometryPoint('geom'),
-    arrivalAt: timestamp('arrival_at', { withTimezone: true }),
+    arrivalAt: timestamp('arrival_at', { withTimezone: true }).notNull(),
     departureAt: timestamp('departure_at', { withTimezone: true }),
-    orderIndex: integer('order_index').notNull().default(0),
     confidence: confidenceEnum('confidence').notNull().default('medium'),
     source: provenanceEnum('source').notNull().default('auto'),
     lockedFields: text('locked_fields').array().notNull().default([]),

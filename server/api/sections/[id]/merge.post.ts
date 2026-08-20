@@ -20,5 +20,5 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Cannot merge a section into itself' })
   }
 
-  return mergeSections(source.id, target.id, source.journeyId)
+  return mergeSections(source.id, target.id)
 })

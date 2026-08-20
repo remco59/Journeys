@@ -9,6 +9,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Section not found' })
   }
 
-  await deleteSection(sectionId, section.journeyId)
+  await deleteSection(sectionId)
   return { ok: true }
 })

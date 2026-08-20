@@ -1,14 +1,19 @@
 import { z } from 'zod'
 
-export const createSectionSchema = z.object({
-  title: z.string().min(1).max(200),
-  placeName: z.string().max(300).optional(),
-  description: z.string().max(4000).optional(),
-  lat: z.number().min(-90).max(90).optional(),
-  lon: z.number().min(-180).max(180).optional(),
-  arrivalAt: z.string().datetime().optional(),
-  departureAt: z.string().datetime().optional()
-})
+export const createSectionSchema = z
+  .object({
+    title: z.string().min(1).max(200),
+    placeName: z.string().max(300).optional(),
+    description: z.string().max(4000).optional(),
+    photoIds: z.array(z.string().uuid()).min(1).optional(),
+    lat: z.number().min(-90).max(90).optional(),
+    lon: z.number().min(-180).max(180).optional(),
+    arrivalAt: z.string().datetime().optional(),
+    departureAt: z.string().datetime().optional()
+  })
+  .refine((v) => !!v.photoIds || (!!v.arrivalAt && v.lat !== undefined && v.lon !== undefined), {
+    message: 'Provide photoIds, or both a location and an arrival time.'
+  })
 export type CreateSectionInput = z.infer<typeof createSectionSchema>
 
 export const updateSectionSchema = z.object({
@@ -17,7 +22,7 @@ export const updateSectionSchema = z.object({
   description: z.string().max(4000).nullable().optional(),
   lat: z.number().min(-90).max(90).optional(),
   lon: z.number().min(-180).max(180).optional(),
-  arrivalAt: z.string().datetime().nullable().optional(),
+  arrivalAt: z.string().datetime().optional(),
   departureAt: z.string().datetime().nullable().optional()
 })
 export type UpdateSectionInput = z.infer<typeof updateSectionSchema>

@@ -5,7 +5,6 @@ import { geoPointSelect } from '../../db/postgis'
 import { buildSectionCandidates, type ClusterPoint } from '../clustering/section-candidates'
 import { reverseGeocode } from '../../geo/geocode'
 import { pickUnlockedFields } from '../provenance/locked-patch'
-import { reindexSectionOrder } from './sections'
 import { reconstructJourneyTraces } from '../traces/reconstruct-journey'
 
 async function fetchClusterablePhotos(journeyId: string): Promise<ClusterPoint[]> {
@@ -158,7 +157,6 @@ export async function clusterJourney(journeyId: string): Promise<ClusterJourneyR
     }
   }
 
-  await reindexSectionOrder(journeyId)
   await deleteEmptyAutoSections(journeyId)
 
   // Sections must settle before the traces between them mean anything.

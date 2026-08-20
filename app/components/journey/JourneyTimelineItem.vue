@@ -2,7 +2,7 @@
 type Section = {
   id: string
   title: string
-  arrivalAt: string | null
+  arrivalAt: string
   confidence: 'high' | 'medium' | 'low' | 'inferred'
 }
 
@@ -28,7 +28,7 @@ const CONNECTOR_STYLE: Record<string, string> = {
   inferred: 'dotted'
 }
 
-const dateLabel = computed(() => (props.section.arrivalAt ? formatDayMonth(props.section.arrivalAt) : null))
+const dateLabel = computed(() => formatDayMonth(props.section.arrivalAt))
 const connectorBorderStyle = computed(() => CONNECTOR_STYLE[props.section.confidence] ?? 'dotted')
 </script>
 
@@ -51,8 +51,7 @@ const connectorBorderStyle = computed(() => CONNECTOR_STYLE[props.section.confid
       <div class="min-w-0 flex-1">
         <p class="truncate font-(family-name:--font-display) text-xl font-medium text-(--color-ink)">{{ section.title }}</p>
         <p class="mt-0.5 font-mono text-xs text-(--color-ink-soft)">
-          <span v-if="dateLabel">{{ dateLabel }}</span>
-          <span v-if="dateLabel"> · </span>
+          {{ dateLabel }} ·
           {{ photoCount }} photo{{ photoCount === 1 ? '' : 's' }}
         </p>
       </div>

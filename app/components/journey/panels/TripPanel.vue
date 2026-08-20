@@ -3,7 +3,7 @@ type Journey = { title: string; description: string | null; startDate: string; e
 type Section = {
   id: string
   title: string
-  arrivalAt: string | null
+  arrivalAt: string
   confidence: 'high' | 'medium' | 'low' | 'inferred'
 }
 type Photo = { id: string; sectionId: string | null; storageKeyThumb: string | null; storageKeyPreview: string | null }

@@ -171,6 +171,17 @@ export async function setJourneyCoverPhoto(journeyId: string, photoId: string) {
 }
 
 /**
+ * Marks a photo as one of the (up to 3) hand-picked highlights for its
+ * section's story block. When no photo in a section carries this flag, the
+ * story falls back to the first 3 by gallery order (see StoryPhotoGrid) —
+ * this only ever narrows that default, it never reorders the gallery.
+ */
+export async function setPhotoShowInStory(photoId: string, show: boolean) {
+  const db = useDb()
+  await db.update(photos).set({ showInStory: show }).where(eq(photos.id, photoId))
+}
+
+/**
  * Removes the DB row and every stored variant (original/preview/thumb).
  * journeys.coverPhotoId is ON DELETE SET NULL, so a deleted cover photo
  * unsets itself rather than leaving a dangling reference.

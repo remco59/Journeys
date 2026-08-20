@@ -70,6 +70,7 @@ export async function listActivitiesForJourney(journeyId: string) {
       elevationGainM: activities.elevationGainM,
       elevationLossM: activities.elevationLossM,
       avgSpeedMps: activities.avgSpeedMps,
+      coverPhotoId: activities.coverPhotoId,
       source: activities.source,
       lockedFields: activities.lockedFields,
       geomGeoJson: lineStringGeoJsonSelect(activities.geom)
@@ -111,7 +112,12 @@ export async function getActivityForOwner(activityId: string, ownerId: string) {
 /** Every field the caller touches becomes both the new value AND a locked field — same provenance mechanism as sections/photos (§12). */
 export async function updateActivityWithLocks(
   activity: typeof activities.$inferSelect,
-  input: { title?: string; type?: (typeof activities.$inferInsert)['type']; sectionId?: string | null }
+  input: {
+    title?: string
+    type?: (typeof activities.$inferInsert)['type']
+    sectionId?: string | null
+    coverPhotoId?: string | null
+  }
 ) {
   const db = useDb()
   const patch: Partial<typeof activities.$inferInsert> = {}
@@ -128,6 +134,10 @@ export async function updateActivityWithLocks(
   if (input.sectionId !== undefined) {
     patch.sectionId = input.sectionId
     newLocks.add('sectionId')
+  }
+  if (input.coverPhotoId !== undefined) {
+    patch.coverPhotoId = input.coverPhotoId
+    newLocks.add('coverPhotoId')
   }
 
   patch.source = 'user_override'

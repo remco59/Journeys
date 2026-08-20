@@ -19,3 +19,8 @@ export const bulkDeletePhotosSchema = z.object({
   photoIds: z.array(z.string().uuid()).min(1)
 })
 export type BulkDeletePhotosInput = z.infer<typeof bulkDeletePhotosSchema>
+
+export const setPhotoShowInStorySchema = z.object({
+  show: z.boolean()
+})
+export type SetPhotoShowInStoryInput = z.infer<typeof setPhotoShowInStorySchema>

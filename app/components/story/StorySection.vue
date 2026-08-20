@@ -4,25 +4,23 @@ type Section = {
   title: string
   placeName: string | null
   description: string | null
-  arrivalAt: string | null
+  arrivalAt: string
   departureAt: string | null
 }
-type Photo = { id: string; storageKeyThumb: string | null; storageKeyPreview: string | null; capturedAt: string | null }
+type Photo = { id: string; storageKeyThumb: string | null; storageKeyPreview: string | null; capturedAt: string | null; showInStory?: boolean }
 
 const props = defineProps<{ section: Section; photos: Photo[] }>()
 
 const linkBase = useLinkBase()
 
-const dateEyebrow = computed(() => (props.section.arrivalAt ? formatDayMonth(props.section.arrivalAt).toUpperCase() : null))
+const dateEyebrow = computed(() => formatDayMonth(props.section.arrivalAt).toUpperCase())
 
 const metaLine = computed(() => {
   const parts: string[] = []
   if (props.section.placeName && props.section.placeName !== props.section.title) parts.push(props.section.placeName)
-  if (props.section.arrivalAt) {
-    let time = `Arrived ${formatTime(props.section.arrivalAt)}`
-    if (props.section.departureAt) time += ` – ${formatTime(props.section.departureAt)}`
-    parts.push(time)
-  }
+  let time = `Arrived ${formatTime(props.section.arrivalAt)}`
+  if (props.section.departureAt) time += ` – ${formatTime(props.section.departureAt)}`
+  parts.push(time)
   return parts.join(' · ')
 })
 </script>

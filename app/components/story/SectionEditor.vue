@@ -4,8 +4,10 @@ type Section = {
   title: string
   placeName: string | null
   description: string | null
-  arrivalAt: string | null
+  arrivalAt: string
   source: 'auto' | 'user_override'
+  lat?: number | null
+  lon?: number | null
 }
 type Photo = {
   id: string
@@ -16,6 +18,7 @@ type Photo = {
   sectionId: string | null
   lat?: number | null
   lon?: number | null
+  showInStory?: boolean
 }
 
 const props = defineProps<{
@@ -85,11 +88,51 @@ watch(
   }
 )
 
+// --- date & location (required fields, no longer clearable once set) ---
+function toDatetimeLocal(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+const arrivalAtLocal = ref(toDatetimeLocal(props.section.arrivalAt))
+const point = ref<{ lat: number; lon: number } | null>(props.section.lat != null && props.section.lon != null ? { lat: props.section.lat, lon: props.section.lon } : null)
+let dateTimeDebounceTimer: ReturnType<typeof setTimeout> | undefined
+let savingDateTime = false
+
+watch(
+  () => props.section,
+  (s) => {
+    if (savingDateTime) return
+    arrivalAtLocal.value = toDatetimeLocal(s.arrivalAt)
+    point.value = s.lat != null && s.lon != null ? { lat: s.lat, lon: s.lon } : null
+  }
+)
+
+function scheduleDateTimeSave() {
+  if (dateTimeDebounceTimer) clearTimeout(dateTimeDebounceTimer)
+  dateTimeDebounceTimer = setTimeout(saveDateTime, 700)
+}
+async function saveDateTime() {
+  if (!arrivalAtLocal.value || !point.value) return
+  savingDateTime = true
+  try {
+    await $fetch(`/api/sections/${props.section.id}`, {
+      method: 'PATCH',
+      body: { arrivalAt: new Date(arrivalAtLocal.value).toISOString(), lat: point.value.lat, lon: point.value.lon }
+    })
+    emit('saved')
+  } finally {
+    savingDateTime = false
+  }
+}
+watch([arrivalAtLocal, point], scheduleDateTimeSave)
+
 function url(key: string | null) {
   return key ? `${filesBase}/${encodeURIComponent(key)}` : null
 }
 
-const dateLabel = computed(() => (props.section.arrivalAt ? formatDayMonth(props.section.arrivalAt) : null))
+const dateLabel = computed(() => formatDayMonth(props.section.arrivalAt))
 </script>
 
 <template>
@@ -111,7 +154,7 @@ const dateLabel = computed(() => (props.section.arrivalAt ? formatDayMonth(props
       <button type="button" class="min-w-0 flex-1 text-left" @click="expanded = !expanded">
         <p class="truncate font-(family-name:--font-display) text-lg font-medium">{{ section.title }}</p>
         <p class="mt-0.5 truncate font-mono text-xs text-(--color-ink-soft)">
-          <span v-if="dateLabel">{{ dateLabel }} · </span>{{ photos.length }} photo{{ photos.length === 1 ? '' : 's' }} ·
+          {{ dateLabel }} · {{ photos.length }} photo{{ photos.length === 1 ? '' : 's' }} ·
           {{ section.source === 'auto' ? 'auto' : 'edited' }}
         </p>
       </button>
@@ -134,6 +177,15 @@ const dateLabel = computed(() => (props.section.arrivalAt ? formatDayMonth(props
         <span class="eyebrow text-(--color-ink-soft)">Description</span>
         <textarea v-model="description" rows="3" placeholder="Add a note about this part of the trip…" class="rounded-lg border border-(--color-line) bg-transparent px-3 py-2" />
       </label>
+
+      <label class="mt-3 flex flex-col gap-1 text-sm">
+        <span class="eyebrow text-(--color-ink-soft)">Date &amp; time</span>
+        <input v-model="arrivalAtLocal" type="datetime-local" required class="rounded-lg border border-(--color-line) bg-transparent px-3 py-2" />
+      </label>
+      <div class="mt-3 flex flex-col gap-1 text-sm">
+        <span class="eyebrow text-(--color-ink-soft)">Location</span>
+        <PhotoMapPointPicker v-model="point" :clearable="false" />
+      </div>
 
       <p class="mt-4 eyebrow text-(--color-ink-soft)">
         {{ selectMode ? 'Photos — tap to select' : 'Photos — tap to edit, star to set as cover' }}

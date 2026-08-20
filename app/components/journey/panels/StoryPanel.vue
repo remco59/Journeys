@@ -10,7 +10,7 @@ const props = defineProps<{
   journey: { title: string }
   sections: Array<
     SectionSummary & {
-      arrivalAt: string | null
+      arrivalAt: string
       departureAt: string | null
       confidence: 'high' | 'medium' | 'low' | 'inferred'
     }
@@ -21,6 +21,7 @@ const props = defineProps<{
     storageKeyThumb: string | null
     storageKeyPreview: string | null
     capturedAt: string | null
+    showInStory?: boolean
   }>
   activities: Array<{
     id: string
@@ -30,11 +31,13 @@ const props = defineProps<{
     endedAt: string
     distanceM: number | null
     elevationGainM: number | null
+    avgSpeedMps?: number | null
+    coverPhotoId?: string | null
+    geom?: { type: 'LineString'; coordinates: [number, number][] } | null
   }>
 }>()
 
 const route = useRoute()
-const linkBase = useLinkBase()
 const readonly = useReadonly()
 
 const photosBySection = computed(() => {
@@ -47,8 +50,8 @@ const photosBySection = computed(() => {
   return map
 })
 
-// Sections stay in their manually-set order (props.sections is already sorted by
-// orderIndex); activities are interleaved into the gaps between dated sections by time.
+// Sections stay in their manually-set order (props.sections is already sorted
+// by arrivalAt); activities are interleaved into the gaps between sections by time.
 type StoryItem =
   | { kind: 'section'; section: (typeof props.sections)[number] }
   | { kind: 'activity'; activity: (typeof props.activities)[number] }
@@ -59,16 +62,11 @@ const storyItems = computed<StoryItem[]>(() => {
   const items: StoryItem[] = []
 
   for (const section of props.sections) {
-    if (section.arrivalAt) {
-      const arrivalTime = new Date(section.arrivalAt).getTime()
-      while (activityIndex < activities.length && new Date(activities[activityIndex]!.startedAt).getTime() < arrivalTime) {
-        items.push({ kind: 'activity', activity: activities[activityIndex]! })
-        activityIndex++
-      }
+    const arrivalTime = new Date(section.arrivalAt).getTime()
+    while (activityIndex < activities.length && new Date(activities[activityIndex]!.startedAt).getTime() < arrivalTime) {
+      items.push({ kind: 'activity', activity: activities[activityIndex]! })
+      activityIndex++
     }
-    // Sections without a known arrival time (e.g. added by hand from the map,
-    // before any timestamped photo pinned them to a moment) still need to
-    // render — otherwise there's nothing for a map-click deep link to scroll to.
     items.push({ kind: 'section', section })
   }
   while (activityIndex < activities.length) {
@@ -96,9 +94,7 @@ onMounted(async () => {
     <div v-if="storyItems.length" class="mt-10 space-y-14">
       <template v-for="item in storyItems" :key="item.kind + (item.kind === 'section' ? item.section.id : item.activity.id)">
         <StorySection v-if="item.kind === 'section'" :section="item.section" :photos="photosBySection.get(item.section.id) ?? []" />
-        <NuxtLink v-else :to="`${linkBase}/map`" class="block">
-          <StoryActivityCard :activity="item.activity" hide-edit />
-        </NuxtLink>
+        <StoryActivityDetail v-else :activity="item.activity" :photos="photos" />
       </template>
     </div>
     <p v-else class="mt-10 text-sm text-(--color-ink-soft)">

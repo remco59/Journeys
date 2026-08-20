@@ -2,6 +2,7 @@ import { pgTable, pgEnum, uuid, varchar, real, integer, timestamp, jsonb, text, 
 import { journeys } from './journeys'
 import { sections } from './sections'
 import { importFiles } from './imports'
+import { photos } from './photos'
 import { provenanceEnum } from './enums'
 import { geometryLineString } from '../postgis'
 
@@ -23,6 +24,7 @@ export const activities = pgTable(
     journeyId: uuid('journey_id').notNull().references(() => journeys.id, { onDelete: 'cascade' }),
     sectionId: uuid('section_id').references(() => sections.id, { onDelete: 'set null' }),
     rawImportFileId: uuid('raw_import_file_id').references(() => importFiles.id, { onDelete: 'set null' }),
+    coverPhotoId: uuid('cover_photo_id').references(() => photos.id, { onDelete: 'set null' }),
 
     title: varchar('title', { length: 200 }).notNull(),
     type: activityTypeEnum('type').notNull().default('other'),

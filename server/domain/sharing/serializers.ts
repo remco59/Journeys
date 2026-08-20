@@ -28,7 +28,7 @@ export function toPublicJourney(journey: {
   }
 }
 
-export function toPublicSection(section: Pick<SectionRow, 'id' | 'title' | 'placeName' | 'description' | 'arrivalAt' | 'departureAt' | 'orderIndex' | 'confidence'> & { lat?: number | null; lon?: number | null }) {
+export function toPublicSection(section: Pick<SectionRow, 'id' | 'title' | 'placeName' | 'description' | 'arrivalAt' | 'departureAt' | 'confidence'> & { lat?: number | null; lon?: number | null }) {
   return {
     id: section.id,
     title: section.title,
@@ -36,7 +36,6 @@ export function toPublicSection(section: Pick<SectionRow, 'id' | 'title' | 'plac
     description: section.description,
     arrivalAt: section.arrivalAt,
     departureAt: section.departureAt,
-    orderIndex: section.orderIndex,
     confidence: section.confidence,
     lat: section.lat ?? null,
     lon: section.lon ?? null
@@ -44,7 +43,10 @@ export function toPublicSection(section: Pick<SectionRow, 'id' | 'title' | 'plac
 }
 
 export function toPublicPhoto(
-  photo: Pick<PhotoRow, 'id' | 'sectionId' | 'storageKeyThumb' | 'storageKeyPreview' | 'capturedAt' | 'caption' | 'locationSource'>
+  photo: Pick<
+    PhotoRow,
+    'id' | 'sectionId' | 'storageKeyThumb' | 'storageKeyPreview' | 'capturedAt' | 'caption' | 'locationSource' | 'showInStory'
+  >
 ) {
   return {
     id: photo.id,
@@ -53,7 +55,8 @@ export function toPublicPhoto(
     storageKeyPreview: photo.storageKeyPreview,
     capturedAt: photo.capturedAt,
     caption: photo.caption,
-    locationSource: photo.locationSource
+    locationSource: photo.locationSource,
+    showInStory: photo.showInStory
     // Deliberately omitted: exif, cameraMake/Model, lockedFields, source,
     // importFileId, storageKeyOriginal — device/provenance detail with no
     // public-viewer purpose. Originals are also simply never served to
@@ -64,7 +67,17 @@ export function toPublicPhoto(
 export function toPublicActivity(
   activity: Pick<
     ActivityRow,
-    'id' | 'sectionId' | 'title' | 'type' | 'startedAt' | 'endedAt' | 'distanceM' | 'elevationGainM' | 'elevationLossM'
+    | 'id'
+    | 'sectionId'
+    | 'title'
+    | 'type'
+    | 'startedAt'
+    | 'endedAt'
+    | 'distanceM'
+    | 'elevationGainM'
+    | 'elevationLossM'
+    | 'avgSpeedMps'
+    | 'coverPhotoId'
   > & { geom: unknown }
 ) {
   return {
@@ -77,6 +90,8 @@ export function toPublicActivity(
     distanceM: activity.distanceM,
     elevationGainM: activity.elevationGainM,
     elevationLossM: activity.elevationLossM,
+    avgSpeedMps: activity.avgSpeedMps,
+    coverPhotoId: activity.coverPhotoId,
     geom: activity.geom
   }
 }

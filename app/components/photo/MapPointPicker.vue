@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import L from 'leaflet'
 
-const props = defineProps<{ modelValue: { lat: number; lon: number } | null }>()
+const props = withDefaults(defineProps<{ modelValue: { lat: number; lon: number } | null; clearable?: boolean }>(), { clearable: true })
 const emit = defineEmits<{ 'update:modelValue': [point: { lat: number; lon: number } | null] }>()
 
 const containerEl = ref<HTMLElement | null>(null)
@@ -53,7 +53,7 @@ function clear() {
     <div ref="containerEl" class="h-52 w-full overflow-hidden rounded-xl" />
     <div class="mt-1.5 flex items-center justify-between font-mono text-xs text-(--color-ink-soft)">
       <span>{{ modelValue ? `${modelValue.lat.toFixed(5)}, ${modelValue.lon.toFixed(5)}` : 'Click the map to set a location' }}</span>
-      <button v-if="modelValue" type="button" class="hover:text-(--color-ink)" @click="clear">Clear</button>
+      <button v-if="modelValue && clearable" type="button" class="hover:text-(--color-ink)" @click="clear">Clear</button>
     </div>
   </div>
 </template>

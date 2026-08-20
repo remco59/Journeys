@@ -5,8 +5,10 @@ type Section = {
   title: string
   placeName: string | null
   description: string | null
-  arrivalAt: string | null
+  arrivalAt: string
   source: 'auto' | 'user_override'
+  lat?: number | null
+  lon?: number | null
 }
 type Photo = {
   id: string
@@ -23,6 +25,7 @@ type Activity = {
   id: string
   title: string
   type: 'cycling' | 'hiking' | 'running' | 'walking' | 'swimming' | 'other'
+  coverPhotoId?: string | null
 }
 
 const props = defineProps<{ journeyId: string; journey: Journey; sections: Section[]; photos: Photo[]; activities: Activity[] }>()
@@ -312,7 +315,14 @@ async function onDeleteJourney() {
 
     <ClientOnly>
       <PhotoEditorDialog ref="photoEditor" :sections="sectionOptions" @saved="onPhotoSaved" @deleted="onPhotoSaved" />
-      <StoryActivityEditorDialog ref="activityEditor" @saved="emit('refresh')" @deleted="emit('refresh')" />
+      <StoryActivityEditorDialog
+        ref="activityEditor"
+        :journey-id="journeyId"
+        :photos="photos"
+        @saved="emit('refresh')"
+        @deleted="emit('refresh')"
+        @refresh-photos="emit('refresh')"
+      />
     </ClientOnly>
 
     <Transition name="view-fade">

@@ -28,7 +28,7 @@ async function fetchOrderedSections(journeyId: string) {
     .where(eq(sections.journeyId, journeyId))
     .orderBy(sections.arrivalAt)
 
-  return rows.filter((s) => s.lat != null && s.lon != null && s.arrivalAt != null && s.departureAt != null) as Array<{
+  return rows.filter((s) => s.lat != null && s.lon != null && s.departureAt != null) as Array<{
     id: string
     arrivalAt: Date
     departureAt: Date

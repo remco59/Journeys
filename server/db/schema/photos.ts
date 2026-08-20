@@ -36,6 +36,7 @@ export const photos = pgTable(
 
     caption: text('caption'),
     isCover: boolean('is_cover').notNull().default(false),
+    showInStory: boolean('show_in_story').notNull().default(false),
 
     source: provenanceEnum('source').notNull().default('auto'),
     lockedFields: text('locked_fields').array().notNull().default([]),

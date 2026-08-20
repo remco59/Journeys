@@ -1,5 +1,5 @@
 <script setup lang="ts">
-type Photo = { id: string; storageKeyThumb: string | null; storageKeyPreview: string | null; capturedAt: string | null }
+type Photo = { id: string; storageKeyThumb: string | null; storageKeyPreview: string | null; capturedAt: string | null; showInStory?: boolean }
 
 const props = defineProps<{ sectionId: string; photos: Photo[] }>()
 
@@ -7,7 +7,13 @@ const MAX_SHOWN = 3
 const linkBase = useLinkBase()
 const filesBase = useFilesBase()
 
-const shown = computed(() => props.photos.slice(0, MAX_SHOWN))
+// Photos stay in gallery order throughout — hand-picked highlights (showInStory)
+// narrow the list down to the featured few without ever reordering it. With no
+// picks made, the default is simply the first 3 by that same gallery order.
+const shown = computed(() => {
+  const picked = props.photos.filter((p) => p.showInStory)
+  return (picked.length ? picked : props.photos).slice(0, MAX_SHOWN)
+})
 const overflowCount = computed(() => Math.max(0, props.photos.length - MAX_SHOWN))
 
 function url(key: string | null) {

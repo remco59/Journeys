@@ -91,7 +91,7 @@ provideJourneyActions({
 
     <ClientOnly>
       <JourneyShareDialog ref="shareDialog" :journey-id="id" />
-      <JourneyAddJourneyContentSheet ref="addSheet" :journey-id="id" @refresh="refreshAll" />
+      <JourneyAddJourneyContentSheet ref="addSheet" :journey-id="id" :photos="photos ?? []" @refresh="refreshAll" />
     </ClientOnly>
   </div>
 </template>
