@@ -2,10 +2,39 @@
 const props = defineProps<{ journeyId: string }>()
 const emit = defineEmits<{ uploaded: [] }>()
 
+const { isNative, pickAndUpload } = usePhotoAccessPlugin()
+
 const fileInput = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 const error = ref<string | null>(null)
 const lastResults = ref<Array<{ filename: string; status: string; reason?: string }>>([])
+
+function onUploadClick() {
+  if (isNative) {
+    onNativePick()
+  } else {
+    fileInput.value?.click()
+  }
+}
+
+// On Android, <input type="file"> routes through the system Photo Picker,
+// which strips GPS EXIF from every photo unconditionally. The native app
+// uses PhotoAccessPlugin instead, which reads originals directly via
+// MediaStore so location data survives.
+async function onNativePick() {
+  error.value = null
+  uploading.value = true
+  lastResults.value = []
+  try {
+    const res = await pickAndUpload(props.journeyId)
+    lastResults.value = res.files
+    emit('uploaded')
+  } catch (err: any) {
+    error.value = typeof err?.message === 'string' ? err.message : 'Upload failed.'
+  } finally {
+    uploading.value = false
+  }
+}
 
 async function onFilesSelected(event: Event) {
   const files = (event.target as HTMLInputElement).files
@@ -38,8 +67,8 @@ async function onFilesSelected(event: Event) {
 
 <template>
   <div class="rounded-2xl border border-dashed border-(--color-stone-line) p-6 text-center">
-    <input ref="fileInput" type="file" accept="image/*" multiple class="hidden" @change="onFilesSelected" />
-    <button class="btn-primary" :disabled="uploading" :class="{ 'animate-pulse-soft': uploading }" @click="fileInput?.click()">
+    <input v-if="!isNative" ref="fileInput" type="file" accept="image/*" multiple class="hidden" @change="onFilesSelected" />
+    <button class="btn-primary" :disabled="uploading" :class="{ 'animate-pulse-soft': uploading }" @click="onUploadClick">
       {{ uploading ? 'Uploading…' : 'Upload photos' }}
     </button>
     <p v-if="error" class="mt-2 text-sm text-(--color-brick)">{{ error }}</p>
