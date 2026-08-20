@@ -1,7 +1,6 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-// TODO: replace with the real production origin once confirmed.
-const PRODUCTION_URL = 'https://journeys.example.com';
+const PRODUCTION_URL = 'https://journeys.remcoland.nl';
 
 const config: CapacitorConfig = {
   appId: 'com.remcoland.journeys',
