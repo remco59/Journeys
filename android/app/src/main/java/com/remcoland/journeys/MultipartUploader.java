@@ -37,7 +37,23 @@ class MultipartUploader {
     }
   }
 
+  interface ProgressListener {
+    // Called after each file's bytes have been written to the request stream,
+    // with the 1-based count of files sent so far in this call.
+    void onFileSent(int sentCount);
+  }
+
   static Result upload(Context context, String uploadUrl, List<Uri> uris, List<String> filenames) throws IOException {
+    return upload(context, uploadUrl, uris, filenames, null);
+  }
+
+  static Result upload(
+    Context context,
+    String uploadUrl,
+    List<Uri> uris,
+    List<String> filenames,
+    ProgressListener listener
+  ) throws IOException {
     String boundary = "JourneysBoundary" + System.currentTimeMillis();
     URL url = new URL(uploadUrl);
     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -77,6 +93,7 @@ class MultipartUploader {
           }
         }
         writeString(out, "\r\n");
+        if (listener != null) listener.onFileSent(i + 1);
       }
       writeString(out, "--" + boundary + "--\r\n");
     }

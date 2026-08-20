@@ -132,6 +132,8 @@ public class PhotoAccessPlugin extends Plugin {
     for (String s : uriStrings) uris.add(Uri.parse(s));
     ArrayList<String> filenames = new ArrayList<>(names);
 
+    int totalCount = uris.size();
+
     uploadExecutor.execute(() -> {
       try {
         String importId = null;
@@ -139,10 +141,18 @@ public class PhotoAccessPlugin extends Plugin {
 
         for (int start = 0; start < uris.size(); start += CHUNK_SIZE) {
           int end = Math.min(start + CHUNK_SIZE, uris.size());
+          int chunkStart = start;
           List<Uri> chunkUris = uris.subList(start, end);
           List<String> chunkNames = filenames.subList(start, end);
 
-          MultipartUploader.Result chunkResult = uploadChunkWithRetry(uploadUrl, chunkUris, chunkNames);
+          MultipartUploader.ProgressListener progressListener = sentCount -> {
+            JSObject progress = new JSObject();
+            progress.put("completed", chunkStart + sentCount);
+            progress.put("total", totalCount);
+            notifyListeners("photoUploadProgress", progress);
+          };
+
+          MultipartUploader.Result chunkResult = uploadChunkWithRetry(uploadUrl, chunkUris, chunkNames, progressListener);
           if (chunkResult != null && chunkResult.statusCode >= 200 && chunkResult.statusCode < 300) {
             JSONObject chunkJson = new JSONObject(chunkResult.body);
             if (importId == null) importId = chunkJson.optString("importId", null);
@@ -176,10 +186,15 @@ public class PhotoAccessPlugin extends Plugin {
     });
   }
 
-  private MultipartUploader.Result uploadChunkWithRetry(String uploadUrl, List<Uri> chunkUris, List<String> chunkNames) {
+  private MultipartUploader.Result uploadChunkWithRetry(
+    String uploadUrl,
+    List<Uri> chunkUris,
+    List<String> chunkNames,
+    MultipartUploader.ProgressListener progressListener
+  ) {
     for (int attempt = 0; attempt <= MAX_RETRIES_PER_CHUNK; attempt++) {
       try {
-        return MultipartUploader.upload(getContext(), uploadUrl, chunkUris, chunkNames);
+        return MultipartUploader.upload(getContext(), uploadUrl, chunkUris, chunkNames, progressListener);
       } catch (IOException e) {
         if (attempt >= MAX_RETRIES_PER_CHUNK) {
           return null;
