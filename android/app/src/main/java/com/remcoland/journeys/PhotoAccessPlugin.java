@@ -44,7 +44,11 @@ public class PhotoAccessPlugin extends Plugin {
     }
   }
 
-  private boolean hasRequiredPermissions() {
+  // Named to avoid colliding with Plugin.hasRequiredPermissions(), which is
+  // public and driven by the (unused here) @CapacitorPlugin permissions
+  // annotation — this plugin checks permissions manually instead since the
+  // required set is SDK-version-dependent (see requiredPermissions()).
+  private boolean hasPhotoPermissions() {
     for (String permission : requiredPermissions()) {
       if (ContextCompat.checkSelfPermission(getContext(), permission) != PackageManager.PERMISSION_GRANTED) {
         return false;
@@ -62,7 +66,7 @@ public class PhotoAccessPlugin extends Plugin {
       return;
     }
 
-    if (!hasRequiredPermissions()) {
+    if (!hasPhotoPermissions()) {
       saveCall(call);
       ActivityCompat.requestPermissions(getActivity(), requiredPermissions(), PERMISSION_REQUEST_CODE);
       return;
@@ -79,11 +83,11 @@ public class PhotoAccessPlugin extends Plugin {
     PluginCall call = getSavedCall();
     if (call == null) return;
 
-    if (hasRequiredPermissions()) {
+    if (hasPhotoPermissions()) {
       launchPicker(call);
     } else {
       call.reject("Photo access permission was denied");
-      removeSavedCall();
+      freeSavedCall();
     }
   }
 
