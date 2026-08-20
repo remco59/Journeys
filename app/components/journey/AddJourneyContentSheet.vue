@@ -117,11 +117,14 @@ async function createSection() {
 </script>
 
 <template>
-  <dialog ref="dialog" class="sheet" @close="mode = null">
+  <dialog ref="dialog" class="sheet" @close="mode = null" @click.self="close">
     <div class="sheet-handle" />
 
     <div v-if="!mode" class="flex flex-col gap-3 p-6 pt-2">
-      <h2 class="font-(family-name:--font-display) text-xl font-medium">Add to your journey</h2>
+      <div class="flex items-center justify-between">
+        <h2 class="font-(family-name:--font-display) text-xl font-medium">Add to your journey</h2>
+        <button type="button" class="text-(--color-ink-soft) hover:text-(--color-ink)" @click="close">✕</button>
+      </div>
       <p v-if="reclusterMessage" class="animate-fade-up text-sm text-(--color-teal)">{{ reclusterMessage }}</p>
       <button
         v-for="opt in OPTIONS"
@@ -140,7 +143,10 @@ async function createSection() {
     </div>
 
     <div v-else class="flex flex-col gap-3 p-6 pt-2">
-      <button type="button" class="self-start text-sm text-(--color-ink-soft) hover:text-(--color-ink)" @click="mode = null">‹ Back</button>
+      <div class="flex items-center justify-between">
+        <button type="button" class="text-sm text-(--color-ink-soft) hover:text-(--color-ink)" @click="mode = null">‹ Back</button>
+        <button type="button" class="text-(--color-ink-soft) hover:text-(--color-ink)" @click="close">✕</button>
+      </div>
 
       <PhotoUploader v-if="mode === 'photos'" :journey-id="journeyId" @uploaded="onUploaded" />
       <ActivityUploader v-else-if="mode === 'activity'" :journey-id="journeyId" @uploaded="onUploaded" />
