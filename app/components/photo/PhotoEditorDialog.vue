@@ -4,8 +4,10 @@ type Photo = {
   caption: string | null
   capturedAt: string | null
   locationSource: string
+  sectionId?: string | null
 }
 
+const props = withDefaults(defineProps<{ sections?: Array<{ id: string; title: string }> }>(), { sections: () => [] })
 const emit = defineEmits<{ saved: []; deleted: [] }>()
 
 const dialog = ref<HTMLDialogElement | null>(null)
@@ -13,6 +15,7 @@ const photo = ref<Photo | null>(null)
 const caption = ref('')
 const capturedAtLocal = ref('')
 const point = ref<{ lat: number; lon: number } | null>(null)
+const sectionId = ref<string | ''>('')
 const error = ref<string | null>(null)
 const submitting = ref(false)
 
@@ -29,6 +32,7 @@ function open(p: Photo, currentPoint: { lat: number; lon: number } | null) {
   caption.value = p.caption ?? ''
   capturedAtLocal.value = toDatetimeLocal(p.capturedAt)
   point.value = currentPoint
+  sectionId.value = p.sectionId ?? ''
   dialog.value?.showModal()
 }
 function close() {
@@ -46,6 +50,9 @@ async function onSubmit() {
     if (point.value) {
       body.lat = point.value.lat
       body.lon = point.value.lon
+    }
+    if (sectionId.value !== (photo.value.sectionId ?? '')) {
+      body.sectionId = sectionId.value || null
     }
     await $fetch(`/api/photos/${photo.value.id}`, { method: 'PATCH', body })
     close()
@@ -73,11 +80,9 @@ async function onDelete() {
 </script>
 
 <template>
-  <dialog
-    ref="dialog"
-    class="w-[28rem] max-w-[90vw] rounded-2xl border border-(--color-line) bg-(--color-paper-raised) p-0 text-(--color-ink) backdrop:bg-black/30"
-  >
-    <form v-if="photo" class="flex flex-col gap-3 p-6" @submit.prevent="onSubmit">
+  <dialog ref="dialog" class="sheet">
+    <div class="sheet-handle" />
+    <form v-if="photo" class="flex flex-col gap-3 p-6 pt-2" @submit.prevent="onSubmit">
       <div class="flex items-center justify-between">
         <h2 class="font-(family-name:--font-display) text-xl font-medium">Edit photo</h2>
         <button type="button" class="text-(--color-ink-soft) hover:text-(--color-ink)" @click="close">✕</button>
@@ -101,16 +106,24 @@ async function onDelete() {
         <PhotoMapPointPicker v-model="point" />
       </div>
 
-      <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+      <label v-if="sections.length" class="flex flex-col gap-1 text-sm">
+        Section
+        <select v-model="sectionId" class="rounded-lg border border-(--color-line) bg-transparent px-3 py-2">
+          <option value="">Unsorted</option>
+          <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.title }}</option>
+        </select>
+      </label>
+
+      <p v-if="error" class="text-sm text-(--color-brick)">{{ error }}</p>
 
       <div class="mt-1 flex items-center justify-between">
         <div class="flex gap-3 text-sm">
           <button type="button" class="text-(--color-ink-soft) hover:text-(--color-ink)" @click="onSetCover">Set as cover</button>
-          <button type="button" class="text-red-600 hover:text-red-700" @click="onDelete">Delete</button>
+          <button type="button" class="text-(--color-brick) hover:opacity-75" @click="onDelete">Delete</button>
         </div>
         <div class="flex gap-2">
           <button type="button" class="rounded-lg px-3 py-2 text-sm text-(--color-ink-soft)" @click="close">Cancel</button>
-          <button type="submit" :disabled="submitting" class="rounded-lg bg-(--color-ink) px-4 py-2 text-sm text-(--color-paper) disabled:opacity-60">
+          <button type="submit" :disabled="submitting" class="btn-primary">
             {{ submitting ? 'Saving…' : 'Save' }}
           </button>
         </div>

@@ -7,6 +7,8 @@ import { findTraceBetween, deleteOrphanedTraces } from './traces'
 import { pickUnlockedFields } from '../provenance/locked-patch'
 import { mapTransportHint } from './transport-hints'
 import { inferTransportFromSpeed } from './transport-inference'
+import { findFlightRoute } from '../../geo/route-lookup/flight-route'
+import { findRailRoute } from '../../geo/route-lookup/rail-route'
 import type { LatLon } from '../clustering/geo-math'
 
 // Allows a little slack between when photos were taken and when the GPS
@@ -109,7 +111,7 @@ async function findCoveringActivity(journeyId: string, afterMs: number, beforeMs
 function activityTypeToTransportMode(type: string): (typeof traces.$inferInsert)['transportMode'] {
   if (type === 'cycling') return 'cycling'
   if (type === 'running' || type === 'walking' || type === 'hiking') return 'walking'
-  return 'unknown'
+  return 'unsure'
 }
 
 function geoJsonToLatLon(raw: string | null): LatLon[] | null {
@@ -175,15 +177,55 @@ export async function reconstructJourneyTraces(journeyId: string): Promise<Recon
       )
 
       // Timeline's own hint outranks a bare speed guess; fall back to the
-      // rule-based estimate only when nothing else resolved a mode, and
-      // only for the "travel" branch — an unknown/curved gap has no real
-      // speed to estimate from (see reconstruct.ts).
+      // rule-based estimate whenever nothing else resolved a mode. Sparse
+      // ("unknown" type) gaps still have a valid endpoint distance/duration
+      // — and that's exactly the shape of a real flight leg (no in-flight
+      // photos, phone in airplane mode) — so this now runs for both gap
+      // shapes; the flight thresholds have enough margin over ordinary
+      // dwell time that this doesn't meaningfully risk false positives.
       let transportMode = mapTransportHint(draft.transportModeHint)
       let transportModeReason: string | null = draft.transportModeHint ? `From Google Timeline (${draft.transportModeHint})` : null
-      if (transportMode === 'unknown' && draft.type === 'travel') {
+      let modeFromSpeedGuess = false
+      if (transportMode === 'unsure') {
         const inferred = inferTransportFromSpeed(draft.distanceM, draft.durationS)
         transportMode = inferred.mode
         transportModeReason = inferred.reason
+        modeFromSpeedGuess = true
+      }
+
+      let geom = draft.geom
+      let distanceM = draft.distanceM
+      let confidence = draft.confidence
+
+      // Real route lookup only applies to sparse gaps: a dense ("travel")
+      // gap already has an actual reconstructed polyline from real photo/
+      // Timeline points, which beats any snapped idealization. A "car" mode
+      // only gets a rail tie-breaker when it came from the ambiguous
+      // speed-guess band (which already admits it could be a train) — not
+      // when Timeline explicitly said driving.
+      if (draft.type === 'unknown') {
+        try {
+          if (transportMode === 'flight') {
+            const flightRoute = findFlightRoute(from, to)
+            if (flightRoute) {
+              geom = flightRoute.geom
+              distanceM = flightRoute.distanceM
+              transportModeReason = flightRoute.reason
+              confidence = 'medium'
+            }
+          } else if (transportMode === 'train' || (transportMode === 'car' && modeFromSpeedGuess)) {
+            const railRoute = await findRailRoute(from, to)
+            if (railRoute) {
+              transportMode = 'train'
+              confidence = 'medium'
+              geom = railRoute.geom
+              distanceM = railRoute.distanceM
+              transportModeReason = railRoute.reason
+            }
+          }
+        } catch {
+          // A lookup failure just skips enrichment — never break clustering.
+        }
       }
 
       proposed = {
@@ -191,11 +233,11 @@ export async function reconstructJourneyTraces(journeyId: string): Promise<Recon
         activityId: null,
         transportMode,
         transportModeReason,
-        geom: draft.geom,
-        confidence: draft.confidence,
+        geom,
+        confidence,
         startedAt: from.departureAt,
         endedAt: to.arrivalAt,
-        distanceM: draft.distanceM,
+        distanceM,
         durationS: Math.round(draft.durationS)
       }
     }

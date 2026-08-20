@@ -63,10 +63,11 @@ async function finish() {
 </script>
 
 <template>
-  <dialog ref="dialog" class="w-[26rem] max-w-[90vw] rounded-2xl border border-(--color-line) bg-(--color-paper-raised) p-0 text-(--color-ink) backdrop:bg-black/30">
-    <form v-if="step === 'details'" class="flex flex-col gap-3 p-6" @submit.prevent="onSubmitDetails">
+  <dialog ref="dialog" class="sheet">
+    <div class="sheet-handle" />
+    <form v-if="step === 'details'" class="flex flex-col gap-3 p-6 pt-2" @submit.prevent="onSubmitDetails">
       <h2 class="font-(family-name:--font-display) text-xl font-medium">New journey</h2>
-      <p class="text-xs text-(--color-ink-soft)">Step 1 of 2 — details</p>
+      <p class="eyebrow text-(--color-ink-soft)">Step 1 of 2 — details</p>
 
       <label class="flex flex-col gap-1 text-sm">
         Title
@@ -89,31 +90,29 @@ async function finish() {
         </label>
       </div>
 
-      <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+      <p v-if="error" class="text-sm text-(--color-brick)">{{ error }}</p>
 
       <div class="mt-2 flex justify-end gap-2">
         <button type="button" class="rounded-lg px-3 py-2 text-sm text-(--color-ink-soft)" @click="close">Cancel</button>
-        <button type="submit" :disabled="submitting" class="rounded-lg bg-(--color-ink) px-4 py-2 text-sm text-(--color-paper) disabled:opacity-60">
+        <button type="submit" :disabled="submitting" class="btn-primary">
           {{ submitting ? 'Creating…' : 'Next: add photos' }}
         </button>
       </div>
     </form>
 
-    <div v-else-if="createdJourneyId" class="flex flex-col gap-3 p-6">
+    <div v-else-if="createdJourneyId" class="flex flex-col gap-3 p-6 pt-2">
       <h2 class="font-(family-name:--font-display) text-xl font-medium">Add photos</h2>
-      <p class="text-xs text-(--color-ink-soft)">Step 2 of 2 — "{{ title }}" was created. Upload photos now, or skip and add them later.</p>
+      <p class="eyebrow text-(--color-ink-soft)">Step 2 of 2 — "{{ title }}" was created. Upload photos now, or skip and add them later.</p>
 
       <PhotoUploader :journey-id="createdJourneyId" @uploaded="onUploaded" />
 
-      <p v-if="uploadedCount" class="text-sm text-(--color-pine)">Photos uploaded — they'll appear in the Story once processed.</p>
+      <p v-if="uploadedCount" class="text-sm text-(--color-teal)">Photos uploaded — they'll appear in the Story once processed.</p>
 
       <div class="mt-2 flex justify-end gap-2">
         <button type="button" class="rounded-lg px-3 py-2 text-sm text-(--color-ink-soft)" @click="finish">
           {{ uploadedCount ? 'Done' : 'Skip for now' }}
         </button>
-        <button type="button" class="rounded-lg bg-(--color-ink) px-4 py-2 text-sm text-(--color-paper)" @click="finish">
-          Go to journey
-        </button>
+        <button type="button" class="btn-primary" @click="finish">Go to journey</button>
       </div>
     </div>
   </dialog>

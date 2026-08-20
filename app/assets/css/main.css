@@ -1,32 +1,51 @@
 @import 'tailwindcss';
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,340;9..144,440;9..144,560;9..144,650&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
-  --color-paper: #f7f6f2;
-  --color-paper-raised: #ffffff;
-  --color-ink: #1c2026;
-  --color-ink-soft: #5b6169;
-  --color-line: #e4e2db;
-  --color-gold: #a97a2f;
-  --color-gold-soft: #c99a52;
-  --color-pine: #2f5d4f;
-  --color-pine-soft: #4c7d6d;
+  --color-paper: #f7f2e6;
+  --color-paper-raised: #efe7d5;
+  --color-ink: #141a20;
+  --color-ink-soft: #2b333b;
+  --color-line: rgba(20, 26, 32, 0.1);
+
+  --color-teal: #2e5c58;
+  --color-teal-deep: #1f433f;
+  --color-gold: #d89b4a;
+  --color-gold-soft: rgba(216, 155, 74, 0.18);
+  --color-brick: #b3503b;
+  --color-stone: #8c8172;
+  --color-stone-line: rgba(140, 129, 114, 0.55);
+  --color-cream: #fbf7ee;
+  --color-activity: #4c5fa5;
+  --color-activity-soft: rgba(76, 95, 165, 0.16);
+
+  /* Fixed dark backdrop for full-bleed photo/map canvases and floating glass
+     chrome (nav pill, icon buttons) — intentionally does NOT flip with theme,
+     since it's the "letterboxing" behind media, not page text. */
+  --color-canvas: #141a20;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-paper: #14171b;
-    --color-paper-raised: #1b1f24;
-    --color-ink: #eceae4;
-    --color-ink-soft: #9aa0a6;
-    --color-line: #2a2e33;
-    --color-gold: #d3a35b;
-    --color-gold-soft: #e0b878;
-    --color-pine: #6fa08e;
-    --color-pine-soft: #8bb6a6;
-  }
+html.dark {
+  color-scheme: dark;
+
+  --color-paper: #171b1f;
+  --color-paper-raised: #1f252b;
+  --color-ink: #ede7d9;
+  --color-ink-soft: #b8b0a0;
+  --color-line: rgba(237, 231, 217, 0.12);
+
+  --color-teal: #6ea89f;
+  --color-teal-deep: #8fc0b7;
+  --color-gold: #e0ab5f;
+  --color-gold-soft: rgba(224, 171, 95, 0.18);
+  --color-brick: #d3765f;
+  --color-stone: #a89d8a;
+  --color-stone-line: rgba(168, 157, 138, 0.4);
+  --color-cream: #f7f2e6;
+  --color-activity: #8b9be0;
+  --color-activity-soft: rgba(139, 155, 224, 0.2);
 }
 
 @theme {
@@ -35,12 +54,20 @@
   --color-ink: var(--color-ink);
   --color-ink-soft: var(--color-ink-soft);
   --color-line: var(--color-line);
+  --color-teal: var(--color-teal);
+  --color-teal-deep: var(--color-teal-deep);
   --color-gold: var(--color-gold);
   --color-gold-soft: var(--color-gold-soft);
-  --color-pine: var(--color-pine);
-  --color-pine-soft: var(--color-pine-soft);
+  --color-brick: var(--color-brick);
+  --color-stone: var(--color-stone);
+  --color-stone-line: var(--color-stone-line);
+  --color-cream: var(--color-cream);
+  --color-activity: var(--color-activity);
+  --color-activity-soft: var(--color-activity-soft);
+  --color-canvas: var(--color-canvas);
   --font-display: 'Fraunces', Georgia, serif;
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
 }
 
 * {
@@ -57,4 +84,300 @@ body {
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
+}
+
+/* Small tracked mono label used above headings and as a section kicker. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* Primary pill action — the one CTA color across the app. */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: 9999px;
+  background: var(--color-teal);
+  color: var(--color-cream);
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 0.6rem 1.25rem;
+  transition: background 0.15s ease;
+}
+.btn-primary:hover {
+  background: var(--color-teal-deep);
+}
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Secondary utility pill — chip-style actions that aren't inline text links. */
+.btn-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border-radius: 9999px;
+  background: var(--color-paper-raised);
+  color: var(--color-ink-soft);
+  font-size: 0.8125rem;
+  padding: 0.5rem 1rem;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.btn-chip:hover {
+  color: var(--color-ink);
+}
+.btn-chip:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Bottom-sheet treatment applied to native <dialog> elements. */
+dialog.sheet {
+  margin: auto auto 0 auto;
+  width: 28rem;
+  max-width: 90vw;
+  max-height: 85vh;
+  border: none;
+  border-radius: 28px 28px 0 0;
+  padding: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  animation: sheetUp 0.38s cubic-bezier(0.22, 0.68, 0, 1);
+}
+dialog.sheet::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+.sheet-handle {
+  width: 40px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--color-line);
+  margin: 12px auto 4px;
+}
+
+@media (min-width: 768px) {
+  dialog.sheet {
+    margin: auto;
+    border-radius: 28px;
+    animation: sheetPop 0.28s cubic-bezier(0.22, 0.68, 0, 1);
+  }
+  .sheet-handle {
+    display: none;
+  }
+}
+
+/* Floating circular icon control over photos/maps. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  background: rgba(20, 26, 32, 0.4);
+  color: var(--color-cream);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background 0.15s ease;
+}
+.icon-btn:hover {
+  background: rgba(20, 26, 32, 0.6);
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes softPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes sheetUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheetPop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.5s ease both;
+}
+
+.animate-pulse-soft {
+  animation: softPulse 1.6s ease-in-out infinite;
+}
+
+/* Reserve space at the bottom of scrollable views for the floating nav + safe area. */
+.pb-nav-safe {
+  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Small dark translucent metadata pill — used over photos and on the map. */
+.dark-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 9999px;
+  background: rgba(20, 26, 32, 0.72);
+  color: var(--color-cream);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  padding: 0.4rem 0.75rem;
+}
+
+/* Gradient scrim under hero/overlay text so it stays legible over any photo. */
+.scrim-bottom {
+  background: linear-gradient(to top, rgba(10, 13, 16, 0.92) 0%, rgba(10, 13, 16, 0.55) 38%, rgba(10, 13, 16, 0) 75%);
+}
+.scrim-top {
+  background: linear-gradient(to bottom, rgba(10, 13, 16, 0.55) 0%, rgba(10, 13, 16, 0) 60%);
+}
+
+/* Horizontally-scrolling strips (gallery filmstrip) without a visible scrollbar. */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* --- Route-level page transitions (app.vue <NuxtPage>) --- */
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(10px) scale(0.99);
+}
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.995);
+}
+
+/* --- In-journey tab transitions (trip/map/story/edit slide by direction; gallery fades as an overlay) --- */
+.view-slide-left-enter-active,
+.view-slide-left-leave-active,
+.view-slide-right-enter-active,
+.view-slide-right-leave-active,
+.view-fade-enter-active,
+.view-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.view-slide-left-enter-from {
+  opacity: 0;
+  transform: translateX(28px);
+}
+.view-slide-left-leave-to {
+  opacity: 0;
+  transform: translateX(-28px);
+}
+.view-slide-right-enter-from {
+  opacity: 0;
+  transform: translateX(-28px);
+}
+.view-slide-right-leave-to {
+  opacity: 0;
+  transform: translateX(28px);
+}
+.view-fade-enter-from,
+.view-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.985);
+}
+
+/* --- Reorderable lists (section editor, timeline) --- */
+.section-list-move,
+.section-list-enter-active,
+.section-list-leave-active {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease;
+}
+.section-list-enter-from {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.98);
+}
+.section-list-leave-to {
+  opacity: 0;
+  transform: translateX(18px);
+}
+.section-list-leave-active {
+  position: absolute;
+  width: 100%;
+}
+
+.timeline-list-move {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* --- Photo viewer crossfade --- */
+.photo-fade-enter-active,
+.photo-fade-leave-active {
+  transition: opacity 0.18s ease;
+}
+.photo-fade-enter-from,
+.photo-fade-leave-to {
+  opacity: 0;
+}
+.photo-fade-leave-active {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-active,
+  .page-leave-active,
+  .view-slide-left-enter-active,
+  .view-slide-left-leave-active,
+  .view-slide-right-enter-active,
+  .view-slide-right-leave-active,
+  .view-fade-enter-active,
+  .view-fade-leave-active,
+  .section-list-move,
+  .section-list-enter-active,
+  .section-list-leave-active,
+  .timeline-list-move,
+  .photo-fade-enter-active,
+  .photo-fade-leave-active {
+    transition: none !important;
+  }
 }

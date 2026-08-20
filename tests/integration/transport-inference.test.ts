@@ -95,7 +95,11 @@ describe('transport mode inference and manual override (live stack)', () => {
     const tracesAfter = await listTraces(cookie, journey.id)
     expect(tracesAfter).toHaveLength(1)
     expect(tracesAfter[0].transportMode).toBe('train')
-    expect(tracesAfter[0].transportModeReason).toBe('Set manually')
+    // The override also re-snaps geom to a real route where one can be
+    // found, so the reason isn't always the literal "Set manually" — what
+    // matters here is that reclustering didn't revert whatever the override
+    // produced.
+    expect(tracesAfter[0].transportModeReason).toBe(updated.transportModeReason)
   }, 40_000)
 
   it('never lets another user override a trace on a journey they do not own', async () => {

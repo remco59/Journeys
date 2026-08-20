@@ -35,35 +35,56 @@ async function createUser() {
 </script>
 
 <template>
-  <main style="max-width: 40rem; margin: 2rem auto; font-family: system-ui;">
-    <h1>Users</h1>
-    <table style="width: 100%; border-collapse: collapse; margin-bottom: 2rem;">
-      <thead>
-        <tr>
-          <th style="text-align: left; border-bottom: 1px solid #ddd; padding: 0.4rem;">Username</th>
-          <th style="text-align: left; border-bottom: 1px solid #ddd; padding: 0.4rem;">Role</th>
-          <th style="text-align: left; border-bottom: 1px solid #ddd; padding: 0.4rem;">Created</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="u in users" :key="u.id">
-          <td style="padding: 0.4rem; border-bottom: 1px solid #f0f0f0;">{{ u.username }}</td>
-          <td style="padding: 0.4rem; border-bottom: 1px solid #f0f0f0;">{{ u.role }}</td>
-          <td style="padding: 0.4rem; border-bottom: 1px solid #f0f0f0;">{{ new Date(u.createdAt).toLocaleDateString() }}</td>
-        </tr>
-      </tbody>
-    </table>
+  <main class="mx-auto min-h-screen max-w-2xl bg-(--color-paper) px-6 py-10">
+    <JourneyBackButton />
+    <p class="eyebrow mt-4 text-(--color-ink-soft)">Admin</p>
+    <h1 class="mt-1 font-(family-name:--font-display) text-2xl font-medium">Users</h1>
 
-    <h2>Create user</h2>
-    <form @submit.prevent="createUser" style="display: flex; flex-direction: column; gap: 0.6rem; max-width: 20rem;">
-      <input v-model="username" placeholder="Username" required />
-      <input v-model="password" type="password" placeholder="Password" required minlength="8" />
-      <select v-model="role">
+    <div class="mt-6 overflow-hidden rounded-2xl bg-(--color-paper-raised) shadow-[0_4px_14px_rgba(20,26,32,0.06)]">
+      <table class="w-full border-collapse">
+        <thead>
+          <tr class="eyebrow text-(--color-ink-soft)">
+            <th class="border-b border-(--color-line) px-4 py-3 text-left font-medium">Username</th>
+            <th class="border-b border-(--color-line) px-4 py-3 text-left font-medium">Role</th>
+            <th class="border-b border-(--color-line) px-4 py-3 text-left font-medium">Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="u in users" :key="u.id">
+            <td class="border-b border-(--color-line) px-4 py-3 text-sm">{{ u.username }}</td>
+            <td class="border-b border-(--color-line) px-4 py-3 font-mono text-xs text-(--color-ink-soft)">{{ u.role }}</td>
+            <td class="border-b border-(--color-line) px-4 py-3 font-mono text-xs text-(--color-ink-soft)">
+              {{ new Date(u.createdAt).toLocaleDateString() }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="mt-10 font-(family-name:--font-display) text-lg font-medium">Create user</h2>
+    <form class="mt-3 flex max-w-xs flex-col gap-3" @submit.prevent="createUser">
+      <input
+        v-model="username"
+        placeholder="Username"
+        required
+        class="rounded-lg border border-(--color-line) bg-transparent px-3 py-2 text-sm"
+      />
+      <input
+        v-model="password"
+        type="password"
+        placeholder="Password"
+        required
+        minlength="8"
+        class="rounded-lg border border-(--color-line) bg-transparent px-3 py-2 text-sm"
+      />
+      <select v-model="role" class="rounded-lg border border-(--color-line) bg-transparent px-3 py-2 text-sm">
         <option value="user">user</option>
         <option value="admin">admin</option>
       </select>
-      <p v-if="error" style="color:#b3261e; margin:0;">{{ error }}</p>
-      <button type="submit" :disabled="submitting">{{ submitting ? 'Creating…' : 'Create user' }}</button>
+      <p v-if="error" class="m-0 text-sm text-(--color-brick)">{{ error }}</p>
+      <button type="submit" :disabled="submitting" class="btn-primary self-start">
+        {{ submitting ? 'Creating…' : 'Create user' }}
+      </button>
     </form>
   </main>
 </template>

@@ -5,6 +5,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libvips-dev \
     exiftool \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # ---- dev: source is bind-mounted / synced by Compose Watch ----

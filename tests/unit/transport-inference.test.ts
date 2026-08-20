@@ -52,9 +52,9 @@ describe('inferTransportFromSpeed', () => {
     expect(inferTransportFromSpeed(450_000, 2.5 * 3600).mode).toBe('flight')
   })
 
-  it('returns unknown, not a guess, for zero distance or duration', () => {
-    expect(inferTransportFromSpeed(0, 3600).mode).toBe('unknown')
-    expect(inferTransportFromSpeed(5000, 0).mode).toBe('unknown')
+  it('returns unsure, not a guess, for zero distance or duration', () => {
+    expect(inferTransportFromSpeed(0, 3600).mode).toBe('unsure')
+    expect(inferTransportFromSpeed(5000, 0).mode).toBe('unsure')
   })
 
   it('every result includes a human-readable reason, never presented as bare certainty', () => {

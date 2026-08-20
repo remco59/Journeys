@@ -42,17 +42,13 @@ async function onFileSelected(event: Event) {
 </script>
 
 <template>
-  <div class="rounded-2xl border border-dashed border-(--color-line) p-6 text-center">
+  <div class="rounded-2xl border border-dashed border-(--color-stone-line) p-6 text-center">
     <input ref="fileInput" type="file" accept=".json" class="hidden" @change="onFileSelected" />
-    <button
-      class="rounded-lg border border-(--color-line) px-4 py-2 text-sm text-(--color-ink-soft) hover:text-(--color-ink) disabled:opacity-60"
-      :disabled="uploading"
-      @click="fileInput?.click()"
-    >
+    <button class="btn-chip" :disabled="uploading" :class="{ 'animate-pulse-soft': uploading }" @click="fileInput?.click()">
       {{ uploading ? 'Importing…' : 'Import Google Timeline' }}
     </button>
-    <p class="mt-2 text-xs text-(--color-ink-soft)">Optional — a Takeout location-history JSON export.</p>
-    <p v-if="error" class="mt-2 text-sm text-red-600">{{ error }}</p>
-    <p v-if="lastSummary" class="mt-2 text-sm text-(--color-ink-soft)">{{ lastSummary }}</p>
+    <p class="mt-2 font-mono text-xs text-(--color-ink-soft)">Optional — a Takeout location-history JSON export.</p>
+    <p v-if="error" class="mt-2 text-sm text-(--color-brick)">{{ error }}</p>
+    <p v-if="lastSummary" class="mt-2 animate-fade-up font-mono text-xs text-(--color-ink-soft)">{{ lastSummary }}</p>
   </div>
 </template>

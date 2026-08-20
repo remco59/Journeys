@@ -63,7 +63,10 @@ describe('reprocessing never clobbers manual edits, even across a real new-data 
       body: JSON.stringify({ sectionId: milanSection.id })
     })
 
-    // Lock 3: override the trace's transport mode.
+    // Lock 3: override the trace's transport mode. This also re-snaps geom
+    // to a real great-circle route between nearby airports, so capture the
+    // resulting reason/geom to compare against after reprocessing, rather
+    // than asserting a literal "Set manually" that no longer always holds.
     let traces = await listTraces(cookie, journey.id)
     expect(traces).toHaveLength(1)
     const traceId = traces[0].id
@@ -72,6 +75,10 @@ describe('reprocessing never clobbers manual edits, even across a real new-data 
       headers: { 'content-type': 'application/json', cookie },
       body: JSON.stringify({ transportMode: 'flight' })
     })
+    const tracesAfterOverride = await listTraces(cookie, journey.id)
+    const traceAfterOverride = tracesAfterOverride.find((t: any) => t.id === traceId)
+    const reasonAfterOverride = traceAfterOverride.transportModeReason
+    const geomAfterOverride = traceAfterOverride.geom
 
     // Now bring in genuinely new, unrelated data: a third stop, uploaded
     // like any normal new-photos import — not a bare recluster call.
@@ -98,7 +105,8 @@ describe('reprocessing never clobbers manual edits, even across a real new-data 
     const overriddenTrace = traces.find((t: any) => t.id === traceId)
     expect(overriddenTrace).toBeTruthy()
     expect(overriddenTrace.transportMode).toBe('flight')
-    expect(overriddenTrace.transportModeReason).toBe('Set manually')
+    expect(overriddenTrace.transportModeReason).toBe(reasonAfterOverride)
+    expect(overriddenTrace.geom).toEqual(geomAfterOverride)
 
     // And the genuinely new stop should still show up as its own section —
     // reprocessing safety doesn't mean reprocessing stops working.

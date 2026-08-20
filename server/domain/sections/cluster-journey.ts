@@ -71,7 +71,7 @@ export async function clusterJourney(journeyId: string): Promise<ClusterJourneyR
   const candidates = points.length
     ? await buildSectionCandidates(points, async (p) => {
         const place = await reverseGeocode(p.lat, p.lon)
-        return place ? { name: place.name, locality: place.locality } : null
+        return place ? { name: place.name, locality: place.locality, district: place.district } : null
       })
     : []
 

@@ -31,9 +31,15 @@ export class PhotonProvider implements ReverseGeocodeProvider {
     const props = body.features?.[0]?.properties
     if (!props) return null
 
+    const locality = props.city ?? props.town ?? props.village ?? props.district ?? null
+    // Only surface district as a distinct, finer-than-city qualifier when we
+    // also have a city/town — otherwise it's already doing locality's job.
+    const district = props.district && props.district !== locality ? props.district : null
+
     return {
       name: props.name ?? props.street ?? null,
-      locality: props.city ?? props.town ?? props.village ?? props.district ?? null,
+      locality,
+      district,
       adminArea: props.state ?? null,
       country: props.country ?? null,
       placeType: props.osm_value ?? props.type ?? null,

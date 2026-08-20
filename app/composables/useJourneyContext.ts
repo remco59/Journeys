@@ -30,3 +30,23 @@ export function useLinkBase(): string {
 export function useReadonly(): boolean {
   return inject(READONLY_KEY, false)
 }
+
+/**
+ * Global dialogs (Share, Add-content sheet) live once at the page shell so
+ * they survive across tab switches; deeply nested components (hero, map)
+ * trigger them through this context instead of each owning their own copy.
+ */
+export type JourneyActions = {
+  openShare: () => void
+  openAddSheet: (mode?: 'photos' | 'activity' | 'timeline' | 'section') => void
+}
+
+const JOURNEY_ACTIONS_KEY: InjectionKey<JourneyActions> = Symbol('journeyActions')
+
+export function provideJourneyActions(actions: JourneyActions) {
+  provide(JOURNEY_ACTIONS_KEY, actions)
+}
+
+export function useJourneyActions(): JourneyActions {
+  return inject(JOURNEY_ACTIONS_KEY, { openShare: () => {}, openAddSheet: () => {} })
+}

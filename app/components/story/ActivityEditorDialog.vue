@@ -51,11 +51,9 @@ async function onDelete() {
 </script>
 
 <template>
-  <dialog
-    ref="dialog"
-    class="w-[26rem] max-w-[90vw] rounded-2xl border border-(--color-line) bg-(--color-paper-raised) p-0 text-(--color-ink) backdrop:bg-black/30"
-  >
-    <form v-if="activity" class="flex flex-col gap-3 p-6" @submit.prevent="onSubmit">
+  <dialog ref="dialog" class="sheet">
+    <div class="sheet-handle" />
+    <form v-if="activity" class="flex flex-col gap-3 p-6 pt-2" @submit.prevent="onSubmit">
       <h2 class="font-(family-name:--font-display) text-xl font-medium">Edit activity</h2>
 
       <label class="flex flex-col gap-1 text-sm">
@@ -75,13 +73,13 @@ async function onDelete() {
         </select>
       </label>
 
-      <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+      <p v-if="error" class="text-sm text-(--color-brick)">{{ error }}</p>
 
       <div class="mt-1 flex items-center justify-between">
-        <button type="button" class="text-sm text-red-600 hover:text-red-700" @click="onDelete">Delete</button>
+        <button type="button" class="text-sm text-(--color-brick) hover:opacity-75" @click="onDelete">Delete</button>
         <div class="flex gap-2">
           <button type="button" class="rounded-lg px-3 py-2 text-sm text-(--color-ink-soft)" @click="close">Cancel</button>
-          <button type="submit" :disabled="submitting" class="rounded-lg bg-(--color-ink) px-4 py-2 text-sm text-(--color-paper) disabled:opacity-60">
+          <button type="submit" :disabled="submitting" class="btn-primary">
             {{ submitting ? 'Saving…' : 'Save' }}
           </button>
         </div>

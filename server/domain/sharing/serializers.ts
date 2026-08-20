@@ -82,7 +82,19 @@ export function toPublicActivity(
 }
 
 export function toPublicTrace(
-  trace: Pick<TraceRow, 'id' | 'fromSectionId' | 'toSectionId' | 'type' | 'transportMode' | 'transportModeReason' | 'confidence'> & {
+  trace: Pick<
+    TraceRow,
+    | 'id'
+    | 'fromSectionId'
+    | 'toSectionId'
+    | 'type'
+    | 'transportMode'
+    | 'transportModeReason'
+    | 'confidence'
+    | 'distanceM'
+    | 'startedAt'
+    | 'endedAt'
+  > & {
     geom: unknown
   }
 ) {
@@ -94,6 +106,9 @@ export function toPublicTrace(
     transportMode: trace.transportMode,
     transportModeReason: trace.transportModeReason,
     confidence: trace.confidence,
+    distanceM: trace.distanceM,
+    startedAt: trace.startedAt,
+    endedAt: trace.endedAt,
     geom: trace.geom
   }
 }

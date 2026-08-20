@@ -1,6 +1,6 @@
-import { listJourneysForOwner } from '../../domain/journeys/journeys'
+import { listJourneySummariesForOwner } from '../../domain/journeys/journeys'
 
 export default defineEventHandler(async (event) => {
   const user = requireUser(event)
-  return listJourneysForOwner(user.id)
+  return listJourneySummariesForOwner(user.id)
 })

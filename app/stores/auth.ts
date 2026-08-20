@@ -4,6 +4,8 @@ export type AuthUser = {
   id: string
   username: string
   role: 'admin' | 'user'
+  theme: 'light' | 'dark' | 'system'
+  distanceUnit: 'km' | 'mi'
 }
 
 export const useAuthStore = defineStore('auth', {

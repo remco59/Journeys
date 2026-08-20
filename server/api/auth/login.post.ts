@@ -37,5 +37,5 @@ export default defineEventHandler(async (event) => {
     expires: session.expiresAt
   })
 
-  return { id: user.id, username: user.username, role: user.role }
+  return { id: user.id, username: user.username, role: user.role, theme: user.theme, distanceUnit: user.distanceUnit }
 })

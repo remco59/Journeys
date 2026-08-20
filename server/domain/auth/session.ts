@@ -7,6 +7,8 @@ export type SessionUser = {
   id: string
   username: string
   role: 'admin' | 'user'
+  theme: 'light' | 'dark' | 'system'
+  distanceUnit: 'km' | 'mi'
 }
 
 export async function createSession(userId: string, ttlDays: number): Promise<{ id: string; expiresAt: Date }> {
@@ -24,7 +26,9 @@ export async function resolveSession(sessionId: string): Promise<SessionUser | n
       sessionExpiresAt: sessions.expiresAt,
       userId: users.id,
       username: users.username,
-      role: users.role
+      role: users.role,
+      theme: users.theme,
+      distanceUnit: users.distanceUnit
     })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
@@ -37,7 +41,7 @@ export async function resolveSession(sessionId: string): Promise<SessionUser | n
     await revokeSession(sessionId)
     return null
   }
-  return { id: row.userId, username: row.username, role: row.role }
+  return { id: row.userId, username: row.username, role: row.role, theme: row.theme, distanceUnit: row.distanceUnit }
 }
 
 export async function revokeSession(sessionId: string): Promise<void> {

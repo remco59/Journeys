@@ -1,4 +1,4 @@
-import { haversineMeters, type LatLon } from '../clustering/geo-math'
+import { haversineMeters, pathDistanceMeters, type LatLon } from '../clustering/geo-math'
 
 export type GapPoint = LatLon & { timestamp: number; source?: 'photo' | 'timeline'; transportModeHint?: string | null }
 
@@ -43,12 +43,6 @@ function curvedInterpolation(from: LatLon, to: LatLon, segments = 24): LatLon[] 
     })
   }
   return points
-}
-
-function pathDistanceMeters(points: LatLon[]): number {
-  let total = 0
-  for (let i = 1; i < points.length; i++) total += haversineMeters(points[i - 1]!, points[i]!)
-  return total
 }
 
 /**

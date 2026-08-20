@@ -117,6 +117,19 @@ export async function updateSectionFields(section: typeof sections.$inferSelect,
   return updated!
 }
 
+/** Manual drag-reorder from the editor. Overrides the arrival-time ordering until the next structural change (create/delete/merge/split) or arrival-time edit reindexes the journey. */
+export async function reorderSections(journeyId: string, orderedIds: string[]) {
+  const db = useDb()
+  const existing = await db.select({ id: sections.id }).from(sections).where(eq(sections.journeyId, journeyId))
+  const existingIds = new Set(existing.map((s) => s.id))
+  if (orderedIds.length !== existingIds.size || orderedIds.some((id) => !existingIds.has(id))) {
+    throw new Error('orderedIds must be exactly the set of section ids in this journey')
+  }
+  for (let i = 0; i < orderedIds.length; i++) {
+    await db.update(sections).set({ orderIndex: i }).where(eq(sections.id, orderedIds[i]!))
+  }
+}
+
 export async function deleteSection(sectionId: string, journeyId: string) {
   const db = useDb()
   // photos.sectionId has onDelete: 'set null' — member photos become unsorted, not deleted.

@@ -42,6 +42,7 @@ export async function reverseGeocode(lat: number, lon: number): Promise<PlaceRes
     return {
       name: hit.placeName,
       locality: hit.locality,
+      district: hit.district,
       adminArea: hit.adminArea,
       country: hit.country,
       placeType: hit.placeType,
@@ -62,6 +63,7 @@ export async function reverseGeocode(lat: number, lon: number): Promise<PlaceRes
       lon,
       placeName: result.name,
       locality: result.locality,
+      district: result.district,
       adminArea: result.adminArea,
       country: result.country,
       placeType: result.placeType,
@@ -73,6 +75,7 @@ export async function reverseGeocode(lat: number, lon: number): Promise<PlaceRes
       set: {
         placeName: result.name,
         locality: result.locality,
+        district: result.district,
         adminArea: result.adminArea,
         country: result.country,
         placeType: result.placeType,

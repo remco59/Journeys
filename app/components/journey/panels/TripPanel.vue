@@ -1,53 +1,37 @@
 <script setup lang="ts">
+type Journey = { title: string; description: string | null; startDate: string; endDate: string; coverPhotoId: string | null }
 type Section = {
   id: string
   title: string
-  placeName: string | null
   arrivalAt: string | null
+  confidence: 'high' | 'medium' | 'low' | 'inferred'
 }
+type Photo = { id: string; sectionId: string | null; storageKeyThumb: string | null; storageKeyPreview: string | null }
+type Trace = { distanceM: number | null }
 
 const props = defineProps<{
+  journey: Journey
   sections: Section[]
-  photosBySection: Map<string | null, Array<{ id: string }>>
+  photos: Photo[]
+  traces: Trace[]
 }>()
 
-const linkBase = useLinkBase()
+const photosBySection = computed(() => {
+  const map = new Map<string | null, Photo[]>()
+  for (const photo of props.photos) {
+    const key = photo.sectionId
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push(photo)
+  }
+  return map
+})
 
-function photoCount(sectionId: string) {
-  return props.photosBySection.get(sectionId)?.length ?? 0
-}
-
-function arrivalLabel(section: Section) {
-  if (!section.arrivalAt) return null
-  const d = new Date(section.arrivalAt)
-  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'long' })
-}
-
-function arrivalTimeLabel(section: Section) {
-  if (!section.arrivalAt) return null
-  return new Date(section.arrivalAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-}
+const totalDistanceM = computed(() => props.traces.reduce((sum, t) => sum + (t.distanceM ?? 0), 0))
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl px-6 py-10">
-    <div v-if="sections.length" class="space-y-3">
-      <NuxtLink
-        v-for="section in sections"
-        :key="section.id"
-        :to="`${linkBase}/story`"
-        class="block rounded-xl border border-(--color-line) bg-(--color-paper-raised) p-4 transition hover:border-(--color-gold)"
-      >
-        <p class="font-(family-name:--font-display) text-lg font-medium">{{ section.title }}</p>
-        <p class="mt-0.5 text-sm text-(--color-ink-soft)">
-          <span v-if="arrivalLabel(section)">{{ arrivalLabel(section) }} · </span>
-          {{ photoCount(section.id) }} photo{{ photoCount(section.id) === 1 ? '' : 's' }}
-          <span v-if="arrivalTimeLabel(section)"> · Arrived {{ arrivalTimeLabel(section) }}</span>
-        </p>
-      </NuxtLink>
-    </div>
-    <p v-else class="text-sm text-(--color-ink-soft)">
-      No sections yet — head to the Story tab and upload some photos to get started.
-    </p>
+  <div>
+    <JourneyHero :journey="journey" :sections="sections" :photos="photos" :total-distance-m="totalDistanceM" />
+    <JourneyTimeline :sections="sections" :photos-by-section="photosBySection" />
   </div>
 </template>

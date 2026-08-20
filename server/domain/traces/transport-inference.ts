@@ -14,7 +14,7 @@ export type InferredTransport = { mode: TransportMode; confidence: Confidence; r
  */
 export function inferTransportFromSpeed(distanceM: number, durationS: number): InferredTransport {
   if (durationS <= 0 || distanceM <= 0) {
-    return { mode: 'unknown', confidence: 'inferred', reason: 'Not enough distance or elapsed time to estimate a speed' }
+    return { mode: 'unsure', confidence: 'inferred', reason: 'Not enough distance or elapsed time to estimate a speed' }
   }
 
   const distanceKm = distanceM / 1000
@@ -43,7 +43,7 @@ export function inferTransportFromSpeed(distanceM: number, durationS: number): I
   }
 
   return {
-    mode: 'unknown',
+    mode: 'unsure',
     confidence: 'inferred',
     reason: `${speedKmh.toFixed(1)} km/h over ${distanceKm.toFixed(1)} km doesn't clearly match a known transport pattern`
   }

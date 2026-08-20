@@ -37,20 +37,16 @@ async function onFilesSelected(event: Event) {
 </script>
 
 <template>
-  <div class="rounded-2xl border border-dashed border-(--color-line) p-6 text-center">
+  <div class="rounded-2xl border border-dashed border-(--color-stone-line) p-6 text-center">
     <input ref="fileInput" type="file" accept=".gpx,.tcx,.fit" multiple class="hidden" @change="onFilesSelected" />
-    <button
-      class="rounded-lg border border-(--color-line) px-4 py-2 text-sm text-(--color-ink-soft) hover:text-(--color-ink) disabled:opacity-60"
-      :disabled="uploading"
-      @click="fileInput?.click()"
-    >
+    <button class="btn-chip" :disabled="uploading" :class="{ 'animate-pulse-soft': uploading }" @click="fileInput?.click()">
       {{ uploading ? 'Importing…' : 'Import activity (GPX/TCX/FIT)' }}
     </button>
-    <p v-if="error" class="mt-2 text-sm text-red-600">{{ error }}</p>
-    <ul v-if="lastResults.length" class="mt-3 space-y-1 text-left text-sm text-(--color-ink-soft)">
+    <p v-if="error" class="mt-2 text-sm text-(--color-brick)">{{ error }}</p>
+    <ul v-if="lastResults.length" class="mt-3 animate-fade-up space-y-1 text-left font-mono text-xs text-(--color-ink-soft)">
       <li v-for="r in lastResults" :key="r.filename">
         {{ r.filename }} —
-        <span :class="{ 'text-red-600': r.status === 'rejected' }">{{ r.status }}</span>
+        <span :class="{ 'text-(--color-brick)': r.status === 'rejected' }">{{ r.status }}</span>
         <span v-if="r.reason"> ({{ r.reason }})</span>
       </li>
     </ul>

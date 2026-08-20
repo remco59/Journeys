@@ -32,3 +32,8 @@ export const splitSectionSchema = z.object({
   title: z.string().min(1).max(200).optional()
 })
 export type SplitSectionInput = z.infer<typeof splitSectionSchema>
+
+export const reorderSectionsSchema = z.object({
+  orderedIds: z.array(z.string().uuid()).min(1)
+})
+export type ReorderSectionsInput = z.infer<typeof reorderSectionsSchema>

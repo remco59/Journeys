@@ -1,10 +1,23 @@
 <script setup lang="ts">
+// Nuxt keys <NuxtPage> by the interpolated route path by default, so without
+// this the whole page (BottomNav included) would remount — and replay the
+// outer page transition — on every tab switch, not just real navigations.
+definePageMeta({ key: (route) => route.params.token as string })
+
 const route = useRoute()
 const token = route.params.token as string
 const activeView = computed(() => {
   const v = route.params.view
   const key = Array.isArray(v) ? v[0] : v
-  return (key ?? 'trip') as 'trip' | 'map' | 'story' | 'gallery'
+  return (key || 'trip') as 'trip' | 'map' | 'story' | 'gallery'
+})
+
+const TAB_ORDER = ['trip', 'map', 'story'] as const
+const viewTransition = ref('view-fade')
+watch(activeView, (next, prev) => {
+  const a = TAB_ORDER.indexOf(prev as (typeof TAB_ORDER)[number])
+  const b = TAB_ORDER.indexOf(next as (typeof TAB_ORDER)[number])
+  viewTransition.value = a === -1 || b === -1 ? 'view-fade' : b > a ? 'view-slide-left' : 'view-slide-right'
 })
 
 provideJourneyContext({ filesBase: `/api/shared/${token}/files`, linkBase: `/shared/${token}`, readonly: true })
@@ -19,51 +32,32 @@ const { data: sections } = await useFetch(`/api/shared/${token}/sections`)
 const { data: traces } = await useFetch(`/api/shared/${token}/traces`)
 const { data: activities } = await useFetch(`/api/shared/${token}/activities`)
 
-const photosBySection = computed(() => {
-  const map = new Map<string | null, NonNullable<typeof photos.value>>()
-  for (const photo of photos.value ?? []) {
-    const key = photo.sectionId
-    if (!map.has(key)) map.set(key, [])
-    map.get(key)!.push(photo)
-  }
-  return map
-})
-
-const durationDays = computed(() => {
-  if (!journey.value) return 0
-  const start = new Date(journey.value.startDate)
-  const end = new Date(journey.value.endDate)
-  return Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1
-})
+// A shared viewer has nothing to Share or Add — the actions exist only so
+// nested components (JourneyHero) can call useJourneyActions() unconditionally.
+provideJourneyActions({ openShare: () => {}, openAddSheet: () => {} })
 </script>
 
 <template>
-  <div v-if="journey" class="min-h-screen bg-(--color-paper) pb-24">
-    <header class="border-b border-(--color-line) bg-(--color-paper-raised)">
-      <div class="mx-auto max-w-4xl px-6 py-6">
-        <p class="text-xs uppercase tracking-wide text-(--color-ink-soft)">Shared journey · read only</p>
-        <h1 class="mt-1 font-(family-name:--font-display) text-3xl font-medium">{{ journey.title }}</h1>
-        <p class="mt-1 text-(--color-ink-soft)">
-          {{ journey.startDate }} – {{ journey.endDate }} · {{ durationDays }} day{{ durationDays === 1 ? '' : 's' }}
-        </p>
-        <p v-if="journey.description" class="mt-3 max-w-2xl text-(--color-ink)">{{ journey.description }}</p>
-      </div>
-    </header>
+  <div v-if="journey" class="min-h-screen bg-(--color-paper)">
+    <Transition :name="viewTransition" mode="out-in">
+      <JourneyPanelsTripPanel v-if="activeView === 'trip'" :journey="journey" :sections="sections ?? []" :photos="photos ?? []" :traces="traces ?? []" />
 
-    <main>
-      <JourneyPanelsTripPanel v-if="activeView === 'trip'" :sections="sections ?? []" :photos-by-section="photosBySection" />
-      <ClientOnly v-else-if="activeView === 'map'">
-        <JourneyPanelsMapPanel :sections="sections ?? []" :traces="traces ?? []" :photos="photos ?? []" />
-      </ClientOnly>
+      <div v-else-if="activeView === 'map'">
+        <ClientOnly>
+          <JourneyPanelsMapPanel :sections="sections ?? []" :traces="traces ?? []" :photos="photos ?? []" />
+        </ClientOnly>
+      </div>
+
       <JourneyPanelsStoryPanel
         v-else-if="activeView === 'story'"
-        journey-id=""
+        :journey="journey"
         :sections="sections ?? []"
         :photos="photos ?? []"
         :activities="activities ?? []"
       />
+
       <JourneyPanelsGalleryPanel v-else-if="activeView === 'gallery'" :sections="sections ?? []" :photos="photos ?? []" />
-    </main>
+    </Transition>
 
     <JourneyBottomNav :active="activeView" />
   </div>

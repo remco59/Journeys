@@ -4,6 +4,11 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-06-01',
   devtools: { enabled: true },
   modules: ['@pinia/nuxt'],
+  app: {
+    head: {
+      viewport: 'width=device-width, initial-scale=1, viewport-fit=cover'
+    }
+  },
   css: ['~/assets/css/main.css'],
   vite: {
     plugins: [tailwindcss()]
@@ -26,8 +31,8 @@ export default defineNuxtConfig({
       secretAccessKey: process.env.S3_SECRET_ACCESS_KEY
     },
     public: {
-      tileProviderUrl: process.env.TILE_PROVIDER_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-      tileAttribution: process.env.TILE_ATTRIBUTION || '© OpenStreetMap contributors'
+      tileProviderUrl: process.env.TILE_PROVIDER_URL || 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+      tileAttribution: process.env.TILE_ATTRIBUTION || '© OpenStreetMap contributors © CARTO'
     }
   },
   nitro: {

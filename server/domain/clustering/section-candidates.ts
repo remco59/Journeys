@@ -4,7 +4,7 @@ import { haversineMeters, centroid, maxRadiusFromCentroidMeters, type LatLon } f
 
 export type ClusterPoint = LatLon & { id: string; timestamp: number }
 
-export type GeocodePlace = { name: string | null; locality: string | null }
+export type GeocodePlace = { name: string | null; locality: string | null; district: string | null }
 export type GeocodeFn = (point: LatLon) => Promise<GeocodePlace | null>
 
 export type SectionCandidate = {
@@ -14,11 +14,17 @@ export type SectionCandidate = {
   departureAt: number
   placeName: string
   locality: string | null
+  /** Neighborhood/suburb, finer than locality — e.g. "San Siro" within "Milano". */
+  district: string | null
   confidence: 'high' | 'medium' | 'low' | 'inferred'
 }
 
 const BASE_EPS_M = 150
-const COARSE_EPS_M = 2000
+// Real single stops can genuinely span kilometers (a racetrack, a museum
+// campus) — this only grows a fine cluster if reverse geocoding also agrees
+// the wider area shares a locality (see clusterWindow below), so a bigger
+// radius mostly buys headroom rather than false merges.
+const COARSE_EPS_M = 4000
 // A fast highway/rail leg connecting two stops shouldn't be merged into one
 // giant "section" just because a coarser radius happens to span it.
 const GROWTH_MAX_SPEED_MPS = 10 // ~36 km/h
@@ -115,7 +121,7 @@ async function clusterWindow(points: ClusterPoint[], geocode: GeocodeFn): Promis
     const span = maxRadiusFromCentroidMeters(members)
     const place = await geocode(center)
 
-    const placeName = (span <= 300 ? place?.name : null) ?? place?.locality ?? 'Unknown location'
+    const placeName = (span <= 300 ? place?.name : null) ?? place?.district ?? place?.locality ?? 'Unknown location'
     const timestamps = members.map((m) => m.timestamp)
 
     candidates.push({
@@ -125,11 +131,89 @@ async function clusterWindow(points: ClusterPoint[], geocode: GeocodeFn): Promis
       departureAt: Math.max(...timestamps),
       placeName,
       locality: place?.locality ?? null,
+      district: place?.district ?? null,
       confidence: members.length >= 3 ? 'high' : members.length === 2 ? 'medium' : 'low'
     })
   }
 
   return candidates.sort((a, b) => a.arrivalAt - b.arrivalAt)
+}
+
+// A gap this short between two same-place stops reads as one day in that
+// area (a racetrack visit spanning town, corners, and hotel; a meal that
+// split a museum visit into separate temporal windows), not a deliberate
+// next-day return — merge those back together. Longer gaps keep sections
+// separate even if the place identity matches.
+const MAX_SAME_PLACE_MERGE_GAP_MS = 18 * 60 * 60 * 1000
+
+type PlaceIdentity = { key: string; label: string }
+
+/**
+ * The identity two candidates are compared on when deciding whether they're
+ * "the same stop": prefer the finest tier both sides actually have data for
+ * — a neighborhood (San Siro), then a city/town (Monza), then falling back
+ * to an exact POI name match for isolated spots with no locality data.
+ * "Unknown location" never anchors a merge — that's a fallback name for
+ * missing data, not evidence two stops are the same place.
+ */
+function placeIdentity(candidate: SectionCandidate): PlaceIdentity | null {
+  if (candidate.district) return { key: `d:${candidate.district.trim().toLowerCase()}`, label: candidate.district }
+  if (candidate.locality) return { key: `l:${candidate.locality.trim().toLowerCase()}`, label: candidate.locality }
+  if (candidate.placeName !== 'Unknown location') {
+    return { key: `n:${candidate.placeName.trim().toLowerCase()}`, label: candidate.placeName }
+  }
+  return null
+}
+
+function mergeCandidates(a: SectionCandidate, label: string, b: SectionCandidate): SectionCandidate {
+  const memberIds = [...a.memberIds, ...b.memberIds]
+  const weightA = a.memberIds.length
+  const weightB = b.memberIds.length
+  const total = weightA + weightB
+  return {
+    memberIds,
+    centroid: {
+      lat: (a.centroid.lat * weightA + b.centroid.lat * weightB) / total,
+      lon: (a.centroid.lon * weightA + b.centroid.lon * weightB) / total
+    },
+    arrivalAt: Math.min(a.arrivalAt, b.arrivalAt),
+    departureAt: Math.max(a.departureAt, b.departureAt),
+    placeName: label,
+    locality: a.locality ?? b.locality,
+    district: a.district ?? b.district,
+    confidence: memberIds.length >= 3 ? 'high' : memberIds.length === 2 ? 'medium' : 'low'
+  }
+}
+
+/**
+ * Adjacent temporal windows are clustered independently, so a single visit
+ * spread across a wide area (a racetrack, a day wandering a city) surfaces
+ * as several consecutive candidates that share a neighborhood or city even
+ * though their specific POI names differ. Collapse those back into one
+ * section — named after the shared neighborhood/city — rather than showing
+ * a long run of narrowly-named stops down the timeline.
+ */
+function mergeAdjacentSamePlace(candidates: SectionCandidate[]): SectionCandidate[] {
+  const merged: SectionCandidate[] = []
+  const identities: PlaceIdentity[] = []
+  for (const candidate of candidates) {
+    const prev = merged[merged.length - 1]
+    const prevIdentity = identities[identities.length - 1]
+    const identity = placeIdentity(candidate)
+    const sameStop =
+      prev &&
+      prevIdentity &&
+      identity &&
+      prevIdentity.key === identity.key &&
+      candidate.arrivalAt - prev.departureAt <= MAX_SAME_PLACE_MERGE_GAP_MS
+    if (prev && sameStop) {
+      merged[merged.length - 1] = mergeCandidates(prev, prevIdentity!.label, candidate)
+    } else {
+      merged.push(candidate)
+      identities.push(identity ?? { key: '', label: candidate.placeName })
+    }
+  }
+  return merged
 }
 
 /**
@@ -144,5 +228,5 @@ export async function buildSectionCandidates(points: ClusterPoint[], geocode: Ge
   for (const window of windows) {
     results.push(...(await clusterWindow(window, cachedGeocode)))
   }
-  return results
+  return mergeAdjacentSamePlace(results)
 }

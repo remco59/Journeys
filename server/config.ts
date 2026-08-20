@@ -19,5 +19,9 @@ export const serverConfig = {
     secretAccessKey: process.env.S3_SECRET_ACCESS_KEY
   },
   geocodeProvider: process.env.GEOCODE_PROVIDER || 'photon',
-  geocodeBaseUrl: process.env.GEOCODE_BASE_URL || 'https://photon.komoot.io'
+  geocodeBaseUrl: process.env.GEOCODE_BASE_URL || 'https://photon.komoot.io',
+  overpassBaseUrl: process.env.OVERPASS_BASE_URL || 'https://overpass-api.de/api/interpreter',
+  osrmCarBaseUrl: process.env.OSRM_CAR_BASE_URL || 'https://routing.openstreetmap.de/routed-car',
+  osrmBikeBaseUrl: process.env.OSRM_BIKE_BASE_URL || 'https://routing.openstreetmap.de/routed-bike',
+  osrmFootBaseUrl: process.env.OSRM_FOOT_BASE_URL || 'https://routing.openstreetmap.de/routed-foot'
 }

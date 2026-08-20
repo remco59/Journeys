@@ -1,4 +1,4 @@
-import { and, eq, or } from 'drizzle-orm'
+import { and, eq, inArray, or } from 'drizzle-orm'
 import { useDb } from '../../db/client'
 import { photos, journeys } from '../../db/schema'
 import { geoPointSelect } from '../../db/postgis'
@@ -142,6 +142,19 @@ export async function updatePhotoWithLocks(photo: typeof photos.$inferSelect, in
   return updated!
 }
 
+/** Bulk section reassignment — reuses updatePhotoWithLocks per photo so the same manual-override/lock semantics apply as a single-photo move. */
+export async function bulkMovePhotosToSection(journeyId: string, photoIds: string[], sectionId: string | null) {
+  const db = useDb()
+  const rows = await db
+    .select()
+    .from(photos)
+    .where(and(inArray(photos.id, photoIds), eq(photos.journeyId, journeyId)))
+  for (const row of rows) {
+    await updatePhotoWithLocks(row, { sectionId })
+  }
+  return rows.length
+}
+
 /** "The first suitable uploaded photo can automatically become the cover photo." */
 export async function maybeSetJourneyCover(journeyId: string, photoId: string) {
   const db = useDb()
@@ -173,4 +186,15 @@ export async function deletePhoto(photo: typeof photos.$inferSelect) {
   )
 
   await db.delete(photos).where(eq(photos.id, photo.id))
+}
+
+/** Bulk delete — scoped to journeyId so a caller can't delete photos outside the journey they've already checked ownership of. */
+export async function bulkDeletePhotos(journeyId: string, photoIds: string[]) {
+  const db = useDb()
+  const rows = await db
+    .select()
+    .from(photos)
+    .where(and(inArray(photos.id, photoIds), eq(photos.journeyId, journeyId)))
+  await Promise.all(rows.map((row) => deletePhoto(row)))
+  return rows.length
 }

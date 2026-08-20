@@ -24,3 +24,42 @@ export function maxRadiusFromCentroidMeters(points: LatLon[]): number {
   const c = centroid(points)
   return Math.max(0, ...points.map((p) => haversineMeters(c, p)))
 }
+
+export function pathDistanceMeters(points: LatLon[]): number {
+  let total = 0
+  for (let i = 1; i < points.length; i++) total += haversineMeters(points[i - 1]!, points[i]!)
+  return total
+}
+
+/**
+ * Spherical (great-circle) interpolation between two points — the geodesic
+ * a flight actually follows, not a straight lat/lon lerp (which cuts the
+ * wrong way on long east-west legs).
+ */
+export function greatCircleInterpolate(from: LatLon, to: LatLon, segments: number): LatLon[] {
+  const toRad = (deg: number) => (deg * Math.PI) / 180
+  const toDeg = (rad: number) => (rad * 180) / Math.PI
+
+  const lat1 = toRad(from.lat)
+  const lon1 = toRad(from.lon)
+  const lat2 = toRad(to.lat)
+  const lon2 = toRad(to.lon)
+
+  const d = 2 * Math.asin(Math.sqrt(Math.sin((lat2 - lat1) / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin((lon2 - lon1) / 2) ** 2))
+
+  if (d === 0) return [{ ...from }, { ...to }]
+
+  const points: LatLon[] = []
+  for (let i = 0; i <= segments; i++) {
+    const f = i / segments
+    const a = Math.sin((1 - f) * d) / Math.sin(d)
+    const b = Math.sin(f * d) / Math.sin(d)
+    const x = a * Math.cos(lat1) * Math.cos(lon1) + b * Math.cos(lat2) * Math.cos(lon2)
+    const y = a * Math.cos(lat1) * Math.sin(lon1) + b * Math.cos(lat2) * Math.sin(lon2)
+    const z = a * Math.sin(lat1) + b * Math.sin(lat2)
+    const lat = Math.atan2(z, Math.sqrt(x ** 2 + y ** 2))
+    const lon = Math.atan2(y, x)
+    points.push({ lat: toDeg(lat), lon: toDeg(lon) })
+  }
+  return points
+}

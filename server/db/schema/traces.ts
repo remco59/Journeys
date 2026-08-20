@@ -7,6 +7,9 @@ import { geometryLineString } from '../postgis'
 
 export const traceTypeEnum = pgEnum('trace_type', ['travel', 'activity', 'unknown'])
 
+// 'unknown' is kept only because Postgres can't cheaply drop an enum value
+// once rows may reference it — app code no longer emits it. 'unsure' is the
+// one fallback value: "we tried and aren't confident," not "we didn't try."
 export const transportModeEnum = pgEnum('transport_mode', [
   'walking',
   'cycling',
@@ -15,7 +18,8 @@ export const transportModeEnum = pgEnum('transport_mode', [
   'bus',
   'ferry',
   'flight',
-  'unknown'
+  'unknown',
+  'unsure'
 ])
 
 export const traces = pgTable(
@@ -27,7 +31,7 @@ export const traces = pgTable(
     toSectionId: uuid('to_section_id').references(() => sections.id, { onDelete: 'cascade' }),
     activityId: uuid('activity_id').references(() => activities.id, { onDelete: 'cascade' }),
     type: traceTypeEnum('type').notNull().default('unknown'),
-    transportMode: transportModeEnum('transport_mode').notNull().default('unknown'),
+    transportMode: transportModeEnum('transport_mode').notNull().default('unsure'),
     /** Human-readable explanation of how transportMode was decided — never presented as certainty when it isn't (§11/§12). */
     transportModeReason: text('transport_mode_reason'),
     geom: geometryLineString('geom'),

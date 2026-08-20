@@ -1,17 +1,13 @@
 <script setup lang="ts">
-import { useMapSyncStore } from '../../../stores/mapSync'
-
 type SectionSummary = {
   id: string
   title: string
   placeName: string | null
   description: string | null
-  lat?: number | null
-  lon?: number | null
 }
 
 const props = defineProps<{
-  journeyId: string
+  journey: { title: string }
   sections: Array<
     SectionSummary & {
       arrivalAt: string | null
@@ -23,11 +19,8 @@ const props = defineProps<{
     id: string
     sectionId: string | null
     storageKeyThumb: string | null
+    storageKeyPreview: string | null
     capturedAt: string | null
-    caption: string | null
-    locationSource: string
-    lat?: number | null
-    lon?: number | null
   }>
   activities: Array<{
     id: string
@@ -40,11 +33,9 @@ const props = defineProps<{
   }>
 }>()
 
-const emit = defineEmits<{ refresh: [] }>()
-
-const mapSync = useMapSyncStore()
-const readonly = useReadonly()
+const route = useRoute()
 const linkBase = useLinkBase()
+const readonly = useReadonly()
 
 const photosBySection = computed(() => {
   const map = new Map<string | null, typeof props.photos>()
@@ -55,158 +46,52 @@ const photosBySection = computed(() => {
   }
   return map
 })
-const unsortedPhotos = computed(() => photosBySection.value.get(null) ?? [])
 
-// Sections and activities interleaved chronologically, per the brief:
-// section -> movement/activity -> section -> activity -> section...
+// Sections and activities interleaved chronologically: section -> movement -> section...
 type StoryItem =
   | { kind: 'section'; time: number; section: (typeof props.sections)[number] }
   | { kind: 'activity'; time: number; activity: (typeof props.activities)[number] }
 
 const storyItems = computed<StoryItem[]>(() => {
-  const items: StoryItem[] = [
+  const timed: StoryItem[] = [
     ...props.sections
       .filter((s) => s.arrivalAt)
       .map((section) => ({ kind: 'section' as const, time: new Date(section.arrivalAt!).getTime(), section })),
     ...props.activities.map((activity) => ({ kind: 'activity' as const, time: new Date(activity.startedAt).getTime(), activity }))
-  ]
-  return items.sort((a, b) => a.time - b.time)
+  ].sort((a, b) => a.time - b.time)
+
+  // Sections without a known arrival time (e.g. added by hand from the map,
+  // before any timestamped photo pinned them to a moment) still need to
+  // render — otherwise there's nothing for a map-click deep link to scroll to.
+  const undated: StoryItem[] = props.sections.filter((s) => !s.arrivalAt).map((section) => ({ kind: 'section' as const, time: Infinity, section }))
+
+  return [...timed, ...undated]
 })
 
-function otherSectionsFor(sectionId: string | null) {
-  if (readonly) return []
-  return props.sections.filter((s) => s.id !== sectionId).map((s) => ({ id: s.id, title: s.title }))
-}
-
-const reclustering = ref(false)
-async function onRecluster() {
-  reclustering.value = true
-  try {
-    await $fetch(`/api/journeys/${props.journeyId}/cluster`, { method: 'POST' })
-    emit('refresh')
-  } finally {
-    reclustering.value = false
-  }
-}
-
-const sectionEditor = ref<{ open: () => void } | null>(null)
-const editingSection = ref<SectionSummary | null>(null)
-
-function openNewSection() {
-  editingSection.value = null
-  sectionEditor.value?.open()
-}
-function openEditSection(section: SectionSummary) {
-  editingSection.value = section
-  sectionEditor.value?.open()
-}
-
-async function onDeleteSection(sectionId: string) {
-  if (!confirm('Delete this section? Its photos become unsorted, not deleted.')) return
-  await $fetch(`/api/sections/${sectionId}`, { method: 'DELETE' })
-  emit('refresh')
-}
-
-async function onMergeSection(sourceId: string, intoSectionId: string) {
-  await $fetch(`/api/sections/${sourceId}/merge`, { method: 'POST', body: { intoSectionId } })
-  emit('refresh')
-}
-
-async function onMovePhoto(photoId: string, sectionId: string) {
-  await $fetch(`/api/photos/${photoId}`, { method: 'PATCH', body: { sectionId } })
-  emit('refresh')
-}
-
-async function onLocate(sectionId: string) {
-  mapSync.select(sectionId)
-  await navigateTo(`${linkBase}/map`)
-}
-
-async function onLocateActivity() {
-  await navigateTo(`${linkBase}/map`)
-}
-
-type EditablePhoto = {
-  id: string
-  caption: string | null
-  capturedAt: string | null
-  locationSource: string
-  lat?: number | null
-  lon?: number | null
-}
-
-const photoEditor = ref<{ open: (p: any, point: { lat: number; lon: number } | null) => void } | null>(null)
-function openEditPhoto(photo: EditablePhoto) {
-  const point = photo.lat != null && photo.lon != null ? { lat: photo.lat, lon: photo.lon } : null
-  photoEditor.value?.open(photo, point)
-}
-
-const activityEditor = ref<{ open: (a: (typeof props.activities)[number]) => void } | null>(null)
-function openEditActivity(activity: (typeof props.activities)[number]) {
-  activityEditor.value?.open(activity)
-}
+onMounted(async () => {
+  const sectionId = route.query.section
+  if (typeof sectionId !== 'string') return
+  await nextTick()
+  document.getElementById(`section-${sectionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+})
 </script>
 
 <template>
-  <div class="mx-auto max-w-4xl px-6 py-10">
-    <div class="mb-6 flex items-start justify-between gap-4">
-      <p class="text-sm text-(--color-ink-soft)">{{ sections.length }} section{{ sections.length === 1 ? '' : 's' }}</p>
-      <div v-if="!readonly" class="flex shrink-0 gap-2">
-        <button
-          class="rounded-lg border border-(--color-line) px-3 py-1.5 text-sm text-(--color-ink-soft) hover:text-(--color-ink)"
-          @click="openNewSection"
-        >
-          New section
-        </button>
-        <button
-          class="rounded-lg border border-(--color-line) px-3 py-1.5 text-sm text-(--color-ink-soft) hover:text-(--color-ink) disabled:opacity-60"
-          :disabled="reclustering"
-          @click="onRecluster"
-        >
-          {{ reclustering ? 'Reclustering…' : 'Recluster now' }}
-        </button>
-      </div>
-    </div>
+  <div class="mx-auto max-w-2xl px-6 pt-8 pb-nav-safe">
+    <JourneyBackButton v-if="!readonly" class="mb-4" />
+    <p class="eyebrow text-(--color-stone)">Story</p>
+    <h1 class="mt-1 font-(family-name:--font-display) text-2xl font-medium text-(--color-ink)">{{ journey.title }}</h1>
 
-    <div v-if="!readonly" class="mb-8 grid gap-3 sm:grid-cols-3">
-      <PhotoUploader :journey-id="journeyId" @uploaded="emit('refresh')" />
-      <ActivityUploader :journey-id="journeyId" @uploaded="emit('refresh')" />
-      <TimelineUploader :journey-id="journeyId" @uploaded="emit('refresh')" />
-    </div>
-
-    <div class="space-y-5">
+    <div v-if="storyItems.length" class="mt-10 space-y-14">
       <template v-for="item in storyItems" :key="item.kind + (item.kind === 'section' ? item.section.id : item.activity.id)">
-        <StorySectionCard
-          v-if="item.kind === 'section'"
-          :section="item.section"
-          :photos="photosBySection.get(item.section.id) ?? []"
-          :other-sections="otherSectionsFor(item.section.id)"
-          @edit="openEditSection(item.section)"
-          @delete="onDeleteSection(item.section.id)"
-          @merge="(intoId: string) => onMergeSection(item.section.id, intoId)"
-          @move-photo="onMovePhoto"
-          @edit-photo="openEditPhoto"
-          @locate="onLocate(item.section.id)"
-        />
-        <StoryActivityCard v-else :activity="item.activity" @locate="onLocateActivity" @edit="openEditActivity(item.activity)" />
+        <StorySection v-if="item.kind === 'section'" :section="item.section" :photos="photosBySection.get(item.section.id) ?? []" />
+        <NuxtLink v-else :to="`${linkBase}/map`" class="block">
+          <StoryActivityCard :activity="item.activity" hide-edit />
+        </NuxtLink>
       </template>
-
-      <div v-if="unsortedPhotos.length" class="rounded-2xl border border-dashed border-(--color-line) p-5">
-        <h3 class="mb-3 font-(family-name:--font-display) text-lg font-medium text-(--color-ink-soft)">
-          Unsorted ({{ unsortedPhotos.length }})
-        </h3>
-        <PhotoGrid :photos="unsortedPhotos" :other-sections="otherSectionsFor(null)" @move="onMovePhoto" @edit="openEditPhoto" />
-      </div>
-
-      <p v-if="!storyItems.length && !unsortedPhotos.length" class="text-sm text-(--color-ink-soft)">
-        {{ readonly ? 'Nothing here yet.' : 'Nothing yet — upload photos or import a GPX track to see the Story build itself.' }}
-      </p>
     </div>
-
-    <ClientOnly v-if="!readonly">
-      <StorySectionEditorDialog ref="sectionEditor" :journey-id="journeyId" :section="editingSection" @saved="emit('refresh')" />
-      <PhotoEditorDialog ref="photoEditor" @saved="emit('refresh')" @deleted="emit('refresh')" />
-      <StoryActivityEditorDialog ref="activityEditor" @saved="emit('refresh')" @deleted="emit('refresh')" />
-    </ClientOnly>
+    <p v-else class="mt-10 text-sm text-(--color-ink-soft)">
+      Nothing here yet — head to Edit to add photos and your story will build itself.
+    </p>
   </div>
 </template>

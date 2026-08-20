@@ -12,9 +12,9 @@ describe('mapTransportHint', () => {
     expect(mapTransportHint('in passenger vehicle')).toBe('car')
     expect(mapTransportHint('cycling')).toBe('cycling')
   })
-  it('falls back to unknown for unrecognized or missing hints', () => {
-    expect(mapTransportHint('teleporting')).toBe('unknown')
-    expect(mapTransportHint(null)).toBe('unknown')
-    expect(mapTransportHint(undefined)).toBe('unknown')
+  it('falls back to unsure for unrecognized or missing hints', () => {
+    expect(mapTransportHint('teleporting')).toBe('unsure')
+    expect(mapTransportHint(null)).toBe('unsure')
+    expect(mapTransportHint(undefined)).toBe('unsure')
   })
 })

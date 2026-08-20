@@ -24,9 +24,9 @@ const HINT_MAP: Record<string, TransportMode> = {
   ferry: 'ferry'
 }
 
-/** Maps a raw Timeline transport hint (any casing/spacing) to our transportMode enum, or 'unknown' if unrecognized. */
+/** Maps a raw Timeline transport hint (any casing/spacing) to our transportMode enum, or 'unsure' if unrecognized. */
 export function mapTransportHint(raw: string | null | undefined): TransportMode {
-  if (!raw) return 'unknown'
+  if (!raw) return 'unsure'
   const key = raw.trim().toLowerCase().replace(/\s+/g, '_')
-  return HINT_MAP[key] ?? 'unknown'
+  return HINT_MAP[key] ?? 'unsure'
 }

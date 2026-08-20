@@ -21,7 +21,11 @@ function jitter(base: { lat: number; lon: number }, metersLat: number, metersLon
 const gridGeocode: GeocodeFn = async (point) => {
   const cellLat = Math.round(point.lat * 500) // ~200m grid cells
   const cellLon = Math.round(point.lon * 500)
-  return { name: `poi-${cellLat}-${cellLon}`, locality: `locality-${Math.round(point.lat * 100)}-${Math.round(point.lon * 100)}` }
+  return {
+    name: `poi-${cellLat}-${cellLon}`,
+    locality: `locality-${Math.round(point.lat * 100)}-${Math.round(point.lon * 100)}`,
+    district: null
+  }
 }
 
 describe('buildSectionCandidates', () => {
@@ -55,7 +59,7 @@ describe('buildSectionCandidates', () => {
       }))
     ]
 
-    const sameLocality: GeocodeFn = async () => ({ name: 'somewhere in milan', locality: 'Milano' })
+    const sameLocality: GeocodeFn = async () => ({ name: 'somewhere in milan', locality: 'Milano', district: null })
     const candidates = await buildSectionCandidates(points, sameLocality)
 
     expect(candidates).toHaveLength(1)
@@ -77,11 +81,14 @@ describe('buildSectionCandidates', () => {
     ]
 
     // Fine-scale place differs from the coarse-scale place: e.g. two
-    // distinct villages that only look "close" at city scale.
-    let call = 0
-    const disagreeingLocality: GeocodeFn = async () => {
-      call++
-      return call % 2 === 1 ? { name: 'village a', locality: 'Village A' } : { name: 'village b', locality: 'Village B' }
+    // distinct villages that only look "close" at city scale. Keyed off the
+    // point itself (not call order) since real reverse geocoding is a pure
+    // function of coordinates.
+    const disagreeingLocality: GeocodeFn = async (point) => {
+      const offsetMeters = (point.lat - MILAN.lat) * 111_320
+      return offsetMeters < 200
+        ? { name: 'village a', locality: 'Village A', district: null }
+        : { name: 'village b', locality: 'Village B', district: null }
     }
 
     const candidates = await buildSectionCandidates(points, disagreeingLocality)
@@ -99,18 +106,94 @@ describe('buildSectionCandidates', () => {
     expect(candidates[0]!.confidence).toBe('low')
   })
 
-  it('splits a return visit to the same coordinates hours apart into two sections', async () => {
+  it('splits a return visit to the same coordinates a day apart into two sections', async () => {
     const points: ClusterPoint[] = [
-      { id: 'morning0', ...MILAN, timestamp: DAY_ONE_START },
-      { id: 'morning1', ...jitter(MILAN, 5, 0), timestamp: DAY_ONE_START + MIN },
-      { id: 'evening0', ...jitter(MILAN, 2, 0), timestamp: DAY_ONE_START + 10 * HOUR },
-      { id: 'evening1', ...jitter(MILAN, 8, 0), timestamp: DAY_ONE_START + 10 * HOUR + MIN }
+      { id: 'day1_0', ...MILAN, timestamp: DAY_ONE_START },
+      { id: 'day1_1', ...jitter(MILAN, 5, 0), timestamp: DAY_ONE_START + MIN },
+      // 20h later — same place identity, but a same-day merge cap shouldn't
+      // reach across an overnight gap into a deliberate next-day return.
+      { id: 'day2_0', ...jitter(MILAN, 2, 0), timestamp: DAY_ONE_START + 20 * HOUR },
+      { id: 'day2_1', ...jitter(MILAN, 8, 0), timestamp: DAY_ONE_START + 20 * HOUR + MIN }
     ]
     const candidates = await buildSectionCandidates(points, gridGeocode)
 
     expect(candidates).toHaveLength(2)
-    expect(candidates[0]!.memberIds.sort()).toEqual(['morning0', 'morning1'])
-    expect(candidates[1]!.memberIds.sort()).toEqual(['evening0', 'evening1'])
+    expect(candidates[0]!.memberIds.sort()).toEqual(['day1_0', 'day1_1'])
+    expect(candidates[1]!.memberIds.sort()).toEqual(['day2_0', 'day2_1'])
+  })
+
+  it('merges different-named stops within the same city into one section, spanning most of a day', async () => {
+    // A town center visit, then (after a gap) a specific landmark a couple
+    // km away — different POI names, but the same locality and well within
+    // the same-day merge cap, the way a full day in Monza (town + racetrack
+    // + hotel) should read as one "Monza" section, not several.
+    const townCenter = { lat: 45.58, lon: 9.27 }
+    const landmark = { lat: 45.615, lon: 9.29 } // ~4.5km away, still "Monza"
+    const monzaGeocode: GeocodeFn = async (point) => {
+      const nearLandmark = haversineMeters(point, landmark) < 500
+      return nearLandmark
+        ? { name: 'Autodromo Nazionale Monza', locality: 'Monza', district: null }
+        : { name: 'Piazza Roma', locality: 'Monza', district: null }
+    }
+
+    const points: ClusterPoint[] = [
+      ...[0, 1].map((i) => ({ id: `town${i}`, ...jitter(townCenter, i * 5, 0), timestamp: DAY_ONE_START + i * MIN })),
+      ...[0, 1].map((i) => ({
+        id: `landmark${i}`,
+        ...jitter(landmark, i * 5, 0),
+        timestamp: DAY_ONE_START + 9 * HOUR + i * MIN
+      }))
+    ]
+    const candidates = await buildSectionCandidates(points, monzaGeocode)
+
+    expect(candidates).toHaveLength(1)
+    expect(candidates[0]!.memberIds.sort()).toEqual(['landmark0', 'landmark1', 'town0', 'town1'])
+    expect(candidates[0]!.placeName).toBe('Monza')
+  })
+
+  it('prefers a shared neighborhood/district name over the city when merging, and over the bare locality when naming', async () => {
+    // Two POIs ~600m apart, both in the "San Siro" district of Milano — should
+    // merge and be named after the neighborhood, not fall all the way back
+    // to "Milano".
+    const stadium = { lat: 45.478, lon: 9.124 }
+    const museum = { lat: 45.483, lon: 9.122 } // ~600m away
+    const sanSiroGeocode: GeocodeFn = async (point) => {
+      const nearStadium = haversineMeters(point, stadium) < 200
+      return nearStadium
+        ? { name: 'Giuseppe Meazza Stadium', locality: 'Milano', district: 'San Siro' }
+        : { name: 'Museo San Siro', locality: 'Milano', district: 'San Siro' }
+    }
+
+    const points: ClusterPoint[] = [
+      ...[0, 1].map((i) => ({ id: `stadium${i}`, ...jitter(stadium, i * 5, 0), timestamp: DAY_ONE_START + i * MIN })),
+      ...[0, 1].map((i) => ({
+        id: `museum${i}`,
+        ...jitter(museum, i * 5, 0),
+        timestamp: DAY_ONE_START + 30 * MIN + i * MIN
+      }))
+    ]
+    const candidates = await buildSectionCandidates(points, sanSiroGeocode)
+
+    expect(candidates).toHaveLength(1)
+    expect(candidates[0]!.memberIds.sort()).toEqual(['museum0', 'museum1', 'stadium0', 'stadium1'])
+    expect(candidates[0]!.placeName).toBe('San Siro')
+  })
+
+  it('merges the same-named place back together when a mid-visit gap splits it into two temporal windows', async () => {
+    const points: ClusterPoint[] = [
+      ...[0, 1].map((i) => ({ id: `early${i}`, ...jitter(MILAN, i * 5, 0), timestamp: DAY_ONE_START + i * MIN })),
+      // A gap long enough to start a new temporal window (e.g. a meal with no photos), but well
+      // under the same-place merge cap — this is still one visit, not a deliberate return trip.
+      ...[0, 1].map((i) => ({
+        id: `late${i}`,
+        ...jitter(MILAN, i * 5, 0),
+        timestamp: DAY_ONE_START + 2 * HOUR + i * MIN
+      }))
+    ]
+    const candidates = await buildSectionCandidates(points, gridGeocode)
+
+    expect(candidates).toHaveLength(1)
+    expect(candidates[0]!.memberIds.sort()).toEqual(['early0', 'early1', 'late0', 'late1'])
   })
 
   it('assigns higher confidence to sections with more corroborating points', async () => {

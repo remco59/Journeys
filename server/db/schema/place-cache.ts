@@ -15,6 +15,7 @@ export const placeCache = pgTable(
     lon: real('lon').notNull(),
     placeName: varchar('place_name', { length: 300 }),
     locality: varchar('locality', { length: 200 }),
+    district: varchar('district', { length: 200 }),
     adminArea: varchar('admin_area', { length: 200 }),
     country: varchar('country', { length: 200 }),
     placeType: varchar('place_type', { length: 60 }),

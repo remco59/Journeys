@@ -1,70 +1,39 @@
 <script setup lang="ts">
+// Nuxt keys <NuxtPage> by the interpolated route path by default, so without
+// this the whole page (BottomNav included) would remount — and replay the
+// outer page transition — on every tab switch, not just real navigations.
+definePageMeta({ key: (route) => route.params.id as string })
+
 const route = useRoute()
 const id = route.params.id as string
 const activeView = computed(() => {
   const v = route.params.view
   const key = Array.isArray(v) ? v[0] : v
-  return (key ?? 'trip') as 'trip' | 'map' | 'story' | 'gallery'
+  return (key || 'trip') as 'trip' | 'map' | 'story' | 'edit' | 'gallery'
+})
+
+const TAB_ORDER = ['trip', 'map', 'story', 'edit'] as const
+const viewTransition = ref('view-fade')
+watch(activeView, (next, prev) => {
+  const a = TAB_ORDER.indexOf(prev as (typeof TAB_ORDER)[number])
+  const b = TAB_ORDER.indexOf(next as (typeof TAB_ORDER)[number])
+  viewTransition.value = a === -1 || b === -1 ? 'view-fade' : b > a ? 'view-slide-left' : 'view-slide-right'
 })
 
 provideJourneyContext({ filesBase: '/api/files', linkBase: `/journeys/${id}`, readonly: false })
 
-const { data: journey, refresh } = await useFetch(`/api/journeys/${id}`)
+const { data: journey, refresh: refreshJourney } = await useFetch(`/api/journeys/${id}`)
 if (!journey.value) {
   throw createError({ statusCode: 404, statusMessage: 'Journey not found' })
 }
-
-const editing = ref(false)
-const title = ref(journey.value.title)
-const description = ref(journey.value.description ?? '')
-const startDate = ref(journey.value.startDate)
-const endDate = ref(journey.value.endDate)
-const error = ref<string | null>(null)
-
-async function saveEdits() {
-  error.value = null
-  try {
-    await $fetch(`/api/journeys/${id}`, {
-      method: 'PATCH',
-      body: { title: title.value, description: description.value, startDate: startDate.value, endDate: endDate.value }
-    })
-    editing.value = false
-    await refresh()
-  } catch (err: any) {
-    error.value = err?.data?.statusMessage ?? 'Could not save changes.'
-  }
-}
-
-async function onDelete() {
-  if (!confirm(`Delete "${journey.value?.title}"? This cannot be undone.`)) return
-  await $fetch(`/api/journeys/${id}`, { method: 'DELETE' })
-  await navigateTo('/')
-}
-
-const durationDays = computed(() => {
-  if (!journey.value) return 0
-  const start = new Date(journey.value.startDate)
-  const end = new Date(journey.value.endDate)
-  return Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1
-})
 
 const { data: photos, refresh: refreshPhotos } = await useFetch(`/api/journeys/${id}/photos`)
 const { data: sections, refresh: refreshSections } = await useFetch(`/api/journeys/${id}/sections`)
 const { data: traces, refresh: refreshTraces } = await useFetch(`/api/journeys/${id}/traces`)
 const { data: activities, refresh: refreshActivities } = await useFetch(`/api/journeys/${id}/activities`)
 
-const photosBySection = computed(() => {
-  const map = new Map<string | null, NonNullable<typeof photos.value>>()
-  for (const photo of photos.value ?? []) {
-    const key = photo.sectionId
-    if (!map.has(key)) map.set(key, [])
-    map.get(key)!.push(photo)
-  }
-  return map
-})
-
 async function refreshAll() {
-  await Promise.all([refreshPhotos(), refreshSections(), refreshTraces(), refreshActivities()])
+  await Promise.all([refreshJourney(), refreshPhotos(), refreshSections(), refreshTraces(), refreshActivities()])
 }
 
 async function onEditTrace(traceId: string, transportMode: string) {
@@ -73,68 +42,56 @@ async function onEditTrace(traceId: string, transportMode: string) {
 }
 
 const shareDialog = ref<{ open: () => void } | null>(null)
+const addSheet = ref<{ open: (mode?: 'photos' | 'activity' | 'timeline' | 'section') => void } | null>(null)
+
+provideJourneyActions({
+  openShare: () => shareDialog.value?.open(),
+  openAddSheet: (mode) => addSheet.value?.open(mode)
+})
 </script>
 
 <template>
-  <div v-if="journey" class="min-h-screen bg-(--color-paper) pb-24">
-    <header class="border-b border-(--color-line) bg-(--color-paper-raised)">
-      <div class="mx-auto max-w-4xl px-6 py-6">
-        <NuxtLink to="/" class="text-sm text-(--color-ink-soft) hover:text-(--color-ink)">← Journeys</NuxtLink>
+  <div v-if="journey" class="min-h-screen bg-(--color-paper)">
+    <Transition :name="viewTransition" mode="out-in">
+      <JourneyPanelsTripPanel v-if="activeView === 'trip'" :journey="journey" :sections="sections ?? []" :photos="photos ?? []" :traces="traces ?? []" />
 
-        <div v-if="!editing" class="mt-2">
-          <h1 class="font-(family-name:--font-display) text-3xl font-medium">{{ journey.title }}</h1>
-          <p class="mt-1 text-(--color-ink-soft)">
-            {{ journey.startDate }} – {{ journey.endDate }} · {{ durationDays }} day{{ durationDays === 1 ? '' : 's' }}
-          </p>
-          <p v-if="journey.description" class="mt-3 max-w-2xl text-(--color-ink)">{{ journey.description }}</p>
-          <div class="mt-4 flex gap-3 text-sm">
-            <button class="text-(--color-ink-soft) hover:text-(--color-ink)" @click="editing = true">Edit</button>
-            <button class="text-(--color-ink-soft) hover:text-(--color-ink)" @click="shareDialog?.open()">Share</button>
-            <button class="text-red-600 hover:text-red-700" @click="onDelete">Delete</button>
-          </div>
-        </div>
-
-        <form v-else class="mt-3 flex max-w-md flex-col gap-3" @submit.prevent="saveEdits">
-          <input v-model="title" required class="rounded-lg border border-(--color-line) bg-transparent px-3 py-2" />
-          <textarea v-model="description" rows="2" class="rounded-lg border border-(--color-line) bg-transparent px-3 py-2" />
-          <div class="flex gap-3">
-            <input v-model="startDate" type="date" class="flex-1 rounded-lg border border-(--color-line) bg-transparent px-3 py-2" />
-            <input v-model="endDate" type="date" class="flex-1 rounded-lg border border-(--color-line) bg-transparent px-3 py-2" />
-          </div>
-          <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
-          <div class="flex gap-2">
-            <button type="submit" class="rounded-lg bg-(--color-ink) px-4 py-2 text-sm text-(--color-paper)">Save</button>
-            <button type="button" class="rounded-lg px-4 py-2 text-sm text-(--color-ink-soft)" @click="editing = false">Cancel</button>
-          </div>
-        </form>
+      <div v-else-if="activeView === 'map'">
+        <ClientOnly>
+          <JourneyPanelsMapPanel :sections="sections ?? []" :traces="traces ?? []" :photos="photos ?? []" @edit-trace="onEditTrace" />
+        </ClientOnly>
       </div>
-    </header>
 
-    <main>
-      <JourneyPanelsTripPanel v-if="activeView === 'trip'" :sections="sections ?? []" :photos-by-section="photosBySection" />
-      <ClientOnly v-else-if="activeView === 'map'">
-        <JourneyPanelsMapPanel :sections="sections ?? []" :traces="traces ?? []" :photos="photos ?? []" @edit-trace="onEditTrace" />
-      </ClientOnly>
       <JourneyPanelsStoryPanel
         v-else-if="activeView === 'story'"
+        :journey="journey"
+        :sections="sections ?? []"
+        :photos="photos ?? []"
+        :activities="activities ?? []"
+      />
+
+      <JourneyPanelsEditPanel
+        v-else-if="activeView === 'edit'"
         :journey-id="id"
+        :journey="journey"
         :sections="sections ?? []"
         :photos="photos ?? []"
         :activities="activities ?? []"
         @refresh="refreshAll"
       />
+
       <JourneyPanelsGalleryPanel
         v-else-if="activeView === 'gallery'"
         :sections="sections ?? []"
         :photos="photos ?? []"
         @refresh="refreshAll"
       />
-    </main>
+    </Transition>
 
     <JourneyBottomNav :active="activeView" />
 
     <ClientOnly>
       <JourneyShareDialog ref="shareDialog" :journey-id="id" />
+      <JourneyAddJourneyContentSheet ref="addSheet" :journey-id="id" @refresh="refreshAll" />
     </ClientOnly>
   </div>
 </template>

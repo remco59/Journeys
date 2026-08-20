@@ -50,8 +50,8 @@ function clear() {
 
 <template>
   <div>
-    <div ref="containerEl" class="h-52 w-full overflow-hidden rounded-lg" />
-    <div class="mt-1.5 flex items-center justify-between text-xs text-(--color-ink-soft)">
+    <div ref="containerEl" class="h-52 w-full overflow-hidden rounded-xl" />
+    <div class="mt-1.5 flex items-center justify-between font-mono text-xs text-(--color-ink-soft)">
       <span>{{ modelValue ? `${modelValue.lat.toFixed(5)}, ${modelValue.lon.toFixed(5)}` : 'Click the map to set a location' }}</span>
       <button v-if="modelValue" type="button" class="hover:text-(--color-ink)" @click="clear">Clear</button>
     </div>

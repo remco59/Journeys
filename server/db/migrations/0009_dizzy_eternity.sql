@@ -1,0 +1,1 @@
+ALTER TABLE "place_cache" ADD COLUMN "district" varchar(200);

@@ -8,3 +8,14 @@ export const updatePhotoSchema = z.object({
   lon: z.number().min(-180).max(180).optional()
 })
 export type UpdatePhotoInput = z.infer<typeof updatePhotoSchema>
+
+export const bulkMovePhotosSchema = z.object({
+  photoIds: z.array(z.string().uuid()).min(1),
+  sectionId: z.string().uuid().nullable()
+})
+export type BulkMovePhotosInput = z.infer<typeof bulkMovePhotosSchema>
+
+export const bulkDeletePhotosSchema = z.object({
+  photoIds: z.array(z.string().uuid()).min(1)
+})
+export type BulkDeletePhotosInput = z.infer<typeof bulkDeletePhotosSchema>
