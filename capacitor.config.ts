@@ -9,7 +9,8 @@ const config: CapacitorConfig = {
   server: {
     url: PRODUCTION_URL,
     androidScheme: 'https',
-    allowNavigation: [new URL(PRODUCTION_URL).hostname]
+    allowNavigation: [new URL(PRODUCTION_URL).hostname],
+    errorPath: 'offline.html'
   }
 };
 

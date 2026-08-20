@@ -8,5 +8,6 @@ public class MainActivity extends BridgeActivity {
   public void onCreate(Bundle savedInstanceState) {
     registerPlugin(PhotoAccessPlugin.class);
     super.onCreate(savedInstanceState);
+    this.bridge.setWebViewClient(new ConnectionAwareWebViewClient(this.bridge));
   }
 }
