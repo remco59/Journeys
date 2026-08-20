@@ -19,6 +19,7 @@ type Photo = {
   locationSource: string
   lat?: number | null
   lon?: number | null
+  showInStory?: boolean
 }
 
 type Activity = {
@@ -97,6 +98,13 @@ async function deleteSection(sectionId: string) {
 
 async function setCover(photoId: string) {
   await $fetch(`/api/photos/${photoId}/set-cover`, { method: 'POST' })
+  emit('refresh')
+}
+
+async function updateStoryPhotos(changes: Array<{ id: string; show: boolean }>) {
+  await Promise.all(
+    changes.map(({ id, show }) => $fetch(`/api/photos/${id}/show-in-story`, { method: 'POST', body: { show } }))
+  )
   emit('refresh')
 }
 
@@ -241,6 +249,7 @@ async function onDeleteJourney() {
         @edit-photo="openEditPhoto"
         @set-cover="setCover"
         @toggle-select="toggleSelect"
+        @update-story-photos="updateStoryPhotos"
         @saved="emit('refresh')"
       />
     </TransitionGroup>

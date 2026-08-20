@@ -40,6 +40,7 @@ const emit = defineEmits<{
   editPhoto: [photo: Photo]
   setCover: [photoId: string]
   toggleSelect: [photoId: string]
+  updateStoryPhotos: [changes: Array<{ id: string; show: boolean }>]
   saved: []
 }>()
 
@@ -133,6 +134,53 @@ function url(key: string | null) {
 }
 
 const dateLabel = computed(() => formatDayMonth(props.section.arrivalAt))
+
+// --- which photos represent this section in the story (StoryPhotoGrid.vue mirrors this) ---
+const MAX_STORY_PHOTOS = 3
+const explicitStoryPhotos = computed(() => props.photos.filter((p) => p.showInStory))
+const isCustomStorySelection = computed(() => explicitStoryPhotos.value.length > 0)
+const effectiveStoryIds = computed(() => {
+  const source = isCustomStorySelection.value ? explicitStoryPhotos.value : props.photos
+  return new Set(source.slice(0, MAX_STORY_PHOTOS).map((p) => p.id))
+})
+const storyLimitNotice = ref(false)
+function flashStoryLimitNotice() {
+  storyLimitNotice.value = true
+  setTimeout(() => (storyLimitNotice.value = false), 2000)
+}
+
+function toggleStoryPhoto(photoId: string) {
+  const currentlyShown = effectiveStoryIds.value.has(photoId)
+  const changes: Array<{ id: string; show: boolean }> = []
+
+  if (!isCustomStorySelection.value) {
+    // First customization in this section — seed explicit picks from what's
+    // currently shown by default, so swapping one photo out doesn't blow
+    // away the other two.
+    for (const id of effectiveStoryIds.value) {
+      if (id !== photoId) changes.push({ id, show: true })
+    }
+    if (currentlyShown) {
+      emit('updateStoryPhotos', changes)
+      return
+    }
+  } else if (currentlyShown) {
+    emit('updateStoryPhotos', [{ id: photoId, show: false }])
+    return
+  }
+
+  if (effectiveStoryIds.value.size >= MAX_STORY_PHOTOS) {
+    flashStoryLimitNotice()
+    return
+  }
+  changes.push({ id: photoId, show: true })
+  emit('updateStoryPhotos', changes)
+}
+
+function resetStoryPhotos() {
+  const changes = explicitStoryPhotos.value.map((p) => ({ id: p.id, show: false }))
+  if (changes.length) emit('updateStoryPhotos', changes)
+}
 </script>
 
 <template>
@@ -187,9 +235,14 @@ const dateLabel = computed(() => formatDayMonth(props.section.arrivalAt))
         <PhotoMapPointPicker v-model="point" :clearable="false" />
       </div>
 
-      <p class="mt-4 eyebrow text-(--color-ink-soft)">
-        {{ selectMode ? 'Photos — tap to select' : 'Photos — tap to edit, star to set as cover' }}
-      </p>
+      <div class="mt-4 flex items-center justify-between gap-2">
+        <p class="eyebrow text-(--color-ink-soft)">
+          {{ selectMode ? 'Photos — tap to select' : 'Photos — tap to edit, star for cover, book for story' }}
+        </p>
+        <button v-if="!selectMode && isCustomStorySelection" type="button" class="shrink-0 text-xs text-(--color-ink-soft) hover:text-(--color-ink)" @click="resetStoryPhotos">
+          Reset story photos
+        </button>
+      </div>
       <div v-if="photos.length" class="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-6">
         <div v-for="p in photos" :key="p.id" class="group relative aspect-square overflow-hidden rounded-lg bg-(--color-paper-raised)">
           <button
@@ -199,16 +252,29 @@ const dateLabel = computed(() => formatDayMonth(props.section.arrivalAt))
           >
             <img v-if="url(p.storageKeyThumb)" :src="url(p.storageKeyThumb)!" class="h-full w-full object-cover" :class="{ 'opacity-60': selectMode && selectedIds?.has(p.id) }" loading="lazy" alt="" />
           </button>
-          <button
-            v-if="!selectMode"
-            type="button"
-            class="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-(--color-canvas)/50 text-xs backdrop-blur-sm"
-            :class="p.id === journeyCoverPhotoId ? 'text-(--color-gold)' : 'text-(--color-cream)/70 opacity-0 group-hover:opacity-100'"
-            title="Set as trip cover"
-            @click.stop="emit('setCover', p.id)"
-          >
-            ★
-          </button>
+          <template v-if="!selectMode">
+            <button
+              type="button"
+              class="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-(--color-canvas)/50 text-xs backdrop-blur-sm"
+              :class="p.id === journeyCoverPhotoId ? 'text-(--color-gold)' : 'text-(--color-cream)/70 opacity-0 group-hover:opacity-100'"
+              title="Set as trip cover"
+              @click.stop="emit('setCover', p.id)"
+            >
+              ★
+            </button>
+            <button
+              type="button"
+              class="absolute bottom-1 left-1 flex h-5 w-5 items-center justify-center rounded-full bg-(--color-canvas)/50 backdrop-blur-sm"
+              :class="effectiveStoryIds.has(p.id) ? 'text-(--color-teal)' : 'text-(--color-cream)/70 opacity-0 group-hover:opacity-100'"
+              :title="effectiveStoryIds.has(p.id) ? 'Shown in story — tap to remove' : 'Tap to feature in story'"
+              @click.stop="toggleStoryPhoto(p.id)"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+                <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
+              </svg>
+            </button>
+          </template>
           <div
             v-else
             class="pointer-events-none absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full text-xs"
@@ -219,6 +285,7 @@ const dateLabel = computed(() => formatDayMonth(props.section.arrivalAt))
         </div>
       </div>
       <p v-else class="mt-2 text-sm text-(--color-ink-soft)">No photos in this section yet.</p>
+      <p v-if="storyLimitNotice" class="mt-2 text-xs text-(--color-brick)">Up to {{ MAX_STORY_PHOTOS }} photos can be featured in the story — remove one first.</p>
 
       <div class="mt-4 flex flex-wrap gap-2 border-t border-(--color-line) pt-3">
         <button v-if="hasNext" type="button" class="btn-chip" @click="emit('mergeWithNext')">Merge with next</button>
