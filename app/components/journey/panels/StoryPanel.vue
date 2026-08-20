@@ -47,25 +47,36 @@ const photosBySection = computed(() => {
   return map
 })
 
-// Sections and activities interleaved chronologically: section -> movement -> section...
+// Sections stay in their manually-set order (props.sections is already sorted by
+// orderIndex); activities are interleaved into the gaps between dated sections by time.
 type StoryItem =
-  | { kind: 'section'; time: number; section: (typeof props.sections)[number] }
-  | { kind: 'activity'; time: number; activity: (typeof props.activities)[number] }
+  | { kind: 'section'; section: (typeof props.sections)[number] }
+  | { kind: 'activity'; activity: (typeof props.activities)[number] }
 
 const storyItems = computed<StoryItem[]>(() => {
-  const timed: StoryItem[] = [
-    ...props.sections
-      .filter((s) => s.arrivalAt)
-      .map((section) => ({ kind: 'section' as const, time: new Date(section.arrivalAt!).getTime(), section })),
-    ...props.activities.map((activity) => ({ kind: 'activity' as const, time: new Date(activity.startedAt).getTime(), activity }))
-  ].sort((a, b) => a.time - b.time)
+  const activities = [...props.activities].sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime())
+  let activityIndex = 0
+  const items: StoryItem[] = []
 
-  // Sections without a known arrival time (e.g. added by hand from the map,
-  // before any timestamped photo pinned them to a moment) still need to
-  // render — otherwise there's nothing for a map-click deep link to scroll to.
-  const undated: StoryItem[] = props.sections.filter((s) => !s.arrivalAt).map((section) => ({ kind: 'section' as const, time: Infinity, section }))
+  for (const section of props.sections) {
+    if (section.arrivalAt) {
+      const arrivalTime = new Date(section.arrivalAt).getTime()
+      while (activityIndex < activities.length && new Date(activities[activityIndex]!.startedAt).getTime() < arrivalTime) {
+        items.push({ kind: 'activity', activity: activities[activityIndex]! })
+        activityIndex++
+      }
+    }
+    // Sections without a known arrival time (e.g. added by hand from the map,
+    // before any timestamped photo pinned them to a moment) still need to
+    // render — otherwise there's nothing for a map-click deep link to scroll to.
+    items.push({ kind: 'section', section })
+  }
+  while (activityIndex < activities.length) {
+    items.push({ kind: 'activity', activity: activities[activityIndex]! })
+    activityIndex++
+  }
 
-  return [...timed, ...undated]
+  return items
 })
 
 onMounted(async () => {
