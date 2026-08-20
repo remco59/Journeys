@@ -252,6 +252,11 @@ public class PhotoPickerActivity extends Activity {
       return view;
     }
 
+    private int dpToPx(int dp) {
+      float density = getResources().getDisplayMetrics().density;
+      return Math.round(dp * density);
+    }
+
     private Bitmap loadThumbnail(Uri uri) {
       try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
