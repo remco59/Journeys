@@ -1,4 +1,4 @@
-import { eq, and, isNotNull } from 'drizzle-orm'
+import { eq, and, isNull, isNotNull } from 'drizzle-orm'
 import { useDb } from '../../db/client'
 import { photos, sections } from '../../db/schema'
 import { geoPointSelect } from '../../db/postgis'
@@ -22,6 +22,45 @@ async function fetchClusterablePhotos(journeyId: string): Promise<ClusterPoint[]
   return rows
     .filter((r) => !r.lockedFields.includes('sectionId') && r.lat != null && r.lon != null && r.capturedAt != null)
     .map((r) => ({ id: r.id, lat: r.lat!, lon: r.lon!, timestamp: r.capturedAt!.getTime() }))
+}
+
+/**
+ * Photos with no resolvable GPS never produce a cluster point, so they'd
+ * otherwise sit unsorted forever. Once every geotagged photo has settled
+ * into a section (this runs after that loop), a location-less photo whose
+ * capture time falls inside one section's [arrivalAt, departureAt] span —
+ * i.e. it was taken between that section's own photos — is placed there
+ * too. A photo matching no section's time span, or matching more than one
+ * (ambiguous), is left unsorted rather than guessed at.
+ */
+async function assignUnlocatedPhotosByTime(journeyId: string): Promise<number> {
+  const db = useDb()
+  const orphans = await db
+    .select({ id: photos.id, capturedAt: photos.capturedAt, lockedFields: photos.lockedFields })
+    .from(photos)
+    .where(and(eq(photos.journeyId, journeyId), isNull(photos.geom), isNull(photos.sectionId), isNotNull(photos.capturedAt)))
+  const candidates = orphans.filter((p) => !p.lockedFields.includes('sectionId'))
+  if (candidates.length === 0) return 0
+
+  const currentSections = await db
+    .select({ id: sections.id, arrivalAt: sections.arrivalAt, departureAt: sections.departureAt })
+    .from(sections)
+    .where(eq(sections.journeyId, journeyId))
+  const timedSections = currentSections.filter((s) => s.arrivalAt != null && s.departureAt != null) as Array<{
+    id: string
+    arrivalAt: Date
+    departureAt: Date
+  }>
+
+  let photosAssigned = 0
+  for (const photo of candidates) {
+    const capturedMs = photo.capturedAt!.getTime()
+    const matches = timedSections.filter((s) => capturedMs >= s.arrivalAt.getTime() && capturedMs <= s.departureAt.getTime())
+    if (matches.length !== 1) continue // no fit, or ambiguous overlap — leave unsorted
+    await db.update(photos).set({ sectionId: matches[0]!.id }).where(eq(photos.id, photo.id))
+    photosAssigned++
+  }
+  return photosAssigned
 }
 
 async function deleteEmptyAutoSections(journeyId: string): Promise<void> {
@@ -156,6 +195,10 @@ export async function clusterJourney(journeyId: string): Promise<ClusterJourneyR
       photosAssigned++
     }
   }
+
+  // Runs last, once every geotagged photo has a settled section — an
+  // undated-location photo can then be matched against real section spans.
+  photosAssigned += await assignUnlocatedPhotosByTime(journeyId)
 
   await deleteEmptyAutoSections(journeyId)
 
