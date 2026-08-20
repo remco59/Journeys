@@ -5,7 +5,7 @@ const PRODUCTION_URL = 'https://journeys.remcoland.nl';
 const config: CapacitorConfig = {
   appId: 'com.remcoland.journeys',
   appName: 'Journeys',
-  webDir: 'public',
+  webDir: 'capacitor/www',
   server: {
     url: PRODUCTION_URL,
     androidScheme: 'https',
