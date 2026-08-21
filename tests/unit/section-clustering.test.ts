@@ -179,6 +179,60 @@ describe('buildSectionCandidates', () => {
     expect(candidates[0]!.placeName).toBe('San Siro')
   })
 
+  it('merges across temporal windows when only one side resolves a district', async () => {
+    // Reverse geocoding doesn't always resolve the same admin tier for every
+    // point — a well-tagged POI gets a district, a quiet side street a few
+    // hundred meters away only gets the city. Both are still "San Siro" at
+    // the tier that's actually available on both sides, so they should merge
+    // rather than reading as two unrelated stops.
+    const stadium = { lat: 45.478, lon: 9.124 }
+    const sideStreet = { lat: 45.4805, lon: 9.123 } // ~300m away
+    const partialDistrictGeocode: GeocodeFn = async (point) => {
+      const nearStadium = haversineMeters(point, stadium) < 200
+      return nearStadium
+        ? { name: 'Giuseppe Meazza Stadium', locality: 'Milano', district: 'San Siro' }
+        : { name: 'Via Piccolomini', locality: 'Milano', district: null }
+    }
+
+    const points: ClusterPoint[] = [
+      ...[0, 1].map((i) => ({ id: `stadium${i}`, ...jitter(stadium, i * 5, 0), timestamp: DAY_ONE_START + i * MIN })),
+      // A gap long enough to force a separate temporal window, so this can
+      // only be joined back together by the cross-window same-place merge.
+      ...[0, 1].map((i) => ({
+        id: `street${i}`,
+        ...jitter(sideStreet, i * 5, 0),
+        timestamp: DAY_ONE_START + 3 * HOUR + i * MIN
+      }))
+    ]
+    const candidates = await buildSectionCandidates(points, partialDistrictGeocode)
+
+    expect(candidates).toHaveLength(1)
+    expect(candidates[0]!.memberIds.sort()).toEqual(['stadium0', 'stadium1', 'street0', 'street1'])
+  })
+
+  it('still keeps two different districts separate even when one side is missing district data', async () => {
+    const stadium = { lat: 45.478, lon: 9.124 }
+    const otherDistrict = { lat: 45.61, lon: 9.29 } // far away, different neighborhood
+    const geocode: GeocodeFn = async (point) => {
+      const nearStadium = haversineMeters(point, stadium) < 200
+      return nearStadium
+        ? { name: 'Giuseppe Meazza Stadium', locality: 'Milano', district: 'San Siro' }
+        : { name: 'Piazza Roma', locality: 'Milano', district: 'Centro' }
+    }
+
+    const points: ClusterPoint[] = [
+      ...[0, 1].map((i) => ({ id: `stadium${i}`, ...jitter(stadium, i * 5, 0), timestamp: DAY_ONE_START + i * MIN })),
+      ...[0, 1].map((i) => ({
+        id: `other${i}`,
+        ...jitter(otherDistrict, i * 5, 0),
+        timestamp: DAY_ONE_START + 3 * HOUR + i * MIN
+      }))
+    ]
+    const candidates = await buildSectionCandidates(points, geocode)
+
+    expect(candidates).toHaveLength(2)
+  })
+
   it('merges the same-named place back together when a mid-visit gap splits it into two temporal windows', async () => {
     const points: ClusterPoint[] = [
       ...[0, 1].map((i) => ({ id: `early${i}`, ...jitter(MILAN, i * 5, 0), timestamp: DAY_ONE_START + i * MIN })),

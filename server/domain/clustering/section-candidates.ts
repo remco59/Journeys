@@ -146,23 +146,35 @@ async function clusterWindow(points: ClusterPoint[], geocode: GeocodeFn): Promis
 // separate even if the place identity matches.
 const MAX_SAME_PLACE_MERGE_GAP_MS = 18 * 60 * 60 * 1000
 
-type PlaceIdentity = { key: string; label: string }
+function normalize(value: string): string {
+  return value.trim().toLowerCase()
+}
 
 /**
- * The identity two candidates are compared on when deciding whether they're
- * "the same stop": prefer the finest tier both sides actually have data for
- * — a neighborhood (San Siro), then a city/town (Monza), then falling back
- * to an exact POI name match for isolated spots with no locality data.
- * "Unknown location" never anchors a merge — that's a fallback name for
- * missing data, not evidence two stops are the same place.
+ * Whether two candidates read as "the same stop", compared at the finest
+ * tier both sides actually have data for — a neighborhood (San Siro), then
+ * a city/town (Monza), then falling back to an exact POI name match for
+ * isolated spots with no locality data. Reverse geocoding doesn't always
+ * resolve the same tier for every point (a park path might not resolve a
+ * district while a POI a few hundred meters away does), so this only
+ * requires *one* shared tier to agree rather than the two candidates'
+ * finest tiers matching exactly — otherwise a district on one side and a
+ * bare locality on the other would read as unrelated even though the
+ * locality on the district side agrees with it. "Unknown location" never
+ * anchors a merge — that's a fallback name for missing data, not evidence
+ * two stops are the same place.
  */
-function placeIdentity(candidate: SectionCandidate): PlaceIdentity | null {
-  if (candidate.district) return { key: `d:${candidate.district.trim().toLowerCase()}`, label: candidate.district }
-  if (candidate.locality) return { key: `l:${candidate.locality.trim().toLowerCase()}`, label: candidate.locality }
-  if (candidate.placeName !== 'Unknown location') {
-    return { key: `n:${candidate.placeName.trim().toLowerCase()}`, label: candidate.placeName }
+function sameStop(a: SectionCandidate, b: SectionCandidate): boolean {
+  if (a.district && b.district) return normalize(a.district) === normalize(b.district)
+  if (a.locality && b.locality) return normalize(a.locality) === normalize(b.locality)
+  if (a.placeName !== 'Unknown location' && b.placeName !== 'Unknown location') {
+    return normalize(a.placeName) === normalize(b.placeName)
   }
-  return null
+  return false
+}
+
+function stopLabel(candidate: SectionCandidate): string {
+  return candidate.district ?? candidate.locality ?? candidate.placeName
 }
 
 function mergeCandidates(a: SectionCandidate, label: string, b: SectionCandidate): SectionCandidate {
@@ -195,22 +207,13 @@ function mergeCandidates(a: SectionCandidate, label: string, b: SectionCandidate
  */
 function mergeAdjacentSamePlace(candidates: SectionCandidate[]): SectionCandidate[] {
   const merged: SectionCandidate[] = []
-  const identities: PlaceIdentity[] = []
   for (const candidate of candidates) {
     const prev = merged[merged.length - 1]
-    const prevIdentity = identities[identities.length - 1]
-    const identity = placeIdentity(candidate)
-    const sameStop =
-      prev &&
-      prevIdentity &&
-      identity &&
-      prevIdentity.key === identity.key &&
-      candidate.arrivalAt - prev.departureAt <= MAX_SAME_PLACE_MERGE_GAP_MS
-    if (prev && sameStop) {
-      merged[merged.length - 1] = mergeCandidates(prev, prevIdentity!.label, candidate)
+    const withinGap = prev && candidate.arrivalAt - prev.departureAt <= MAX_SAME_PLACE_MERGE_GAP_MS
+    if (prev && withinGap && sameStop(prev, candidate)) {
+      merged[merged.length - 1] = mergeCandidates(prev, stopLabel(prev), candidate)
     } else {
       merged.push(candidate)
-      identities.push(identity ?? { key: '', label: candidate.placeName })
     }
   }
   return merged
