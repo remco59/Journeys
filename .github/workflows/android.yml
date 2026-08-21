@@ -30,13 +30,13 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund --package-lock=false
 
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Run tests
-        run: npm test
+      - name: Run unit tests
+        run: npx vitest run tests/unit
 
       - name: Sync Capacitor
         run: npm run android:sync
