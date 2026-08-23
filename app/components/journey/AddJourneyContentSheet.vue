@@ -1,8 +1,8 @@
 <script setup lang="ts">
-type Mode = 'photos' | 'activity' | 'timeline' | 'section' | null
+type Mode = 'photos' | 'immich' | 'activity' | 'timeline' | 'section' | null
 type Photo = { id: string; sectionId: string | null; storageKeyThumb: string | null }
 
-const props = defineProps<{ journeyId: string; photos: Photo[] }>()
+const props = defineProps<{ journeyId: string; journey: { startDate: string; endDate: string }; photos: Photo[] }>()
 const emit = defineEmits<{ refresh: [] }>()
 
 const filesBase = useFilesBase()
@@ -18,6 +18,7 @@ const reclusterMessage = ref<string | null>(null)
 
 const OPTIONS: Array<{ mode: Exclude<Mode, null> | 'recluster'; label: string; hint?: string }> = [
   { mode: 'photos', label: 'Add photos' },
+  { mode: 'immich', label: 'Import from Immich' },
   { mode: 'activity', label: 'Import activity', hint: 'GPX, TCX or FIT' },
   { mode: 'timeline', label: 'Import Google Timeline', hint: 'Optional — a Takeout export' },
   { mode: 'section', label: 'Create section' },
@@ -156,6 +157,7 @@ async function createSection() {
       </div>
 
       <PhotoUploader v-if="mode === 'photos'" :journey-id="journeyId" @uploaded="onUploaded" />
+      <PhotoImmichPicker v-else-if="mode === 'immich'" :journey-id="journeyId" :journey="journey" @uploaded="onUploaded" />
       <ActivityUploader v-else-if="mode === 'activity'" :journey-id="journeyId" @uploaded="onUploaded" />
       <TimelineUploader v-else-if="mode === 'timeline'" :journey-id="journeyId" @uploaded="onUploaded" />
 

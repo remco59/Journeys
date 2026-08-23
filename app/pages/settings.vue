@@ -49,6 +49,47 @@ async function saveUsername() {
   }
 }
 
+const immichStatus = ref<{ connected: boolean; baseUrl: string | null } | null>(null)
+const immichUrl = ref('')
+const immichApiKey = ref('')
+const immichError = ref<string | null>(null)
+const immichSubmitting = ref(false)
+
+type ImmichStatus = { connected: boolean; baseUrl: string | null }
+
+onMounted(async () => {
+  const status = await $fetch<ImmichStatus>('/api/account/immich')
+  immichStatus.value = status
+  immichUrl.value = status.baseUrl ?? ''
+})
+
+async function connectImmich() {
+  immichError.value = null
+  immichSubmitting.value = true
+  try {
+    immichStatus.value = await $fetch<ImmichStatus>('/api/account/immich', {
+      method: 'PATCH',
+      body: { baseUrl: immichUrl.value, apiKey: immichApiKey.value }
+    })
+    immichApiKey.value = ''
+  } catch (err: any) {
+    immichError.value = err?.data?.statusMessage ?? 'Could not connect to Immich.'
+  } finally {
+    immichSubmitting.value = false
+  }
+}
+
+async function disconnectImmich() {
+  immichSubmitting.value = true
+  try {
+    immichStatus.value = await $fetch<ImmichStatus>('/api/account/immich', { method: 'DELETE' })
+    immichUrl.value = ''
+    immichApiKey.value = ''
+  } finally {
+    immichSubmitting.value = false
+  }
+}
+
 const currentPassword = ref('')
 const newPassword = ref('')
 const confirmPassword = ref('')
@@ -125,6 +166,46 @@ async function savePassword() {
           Miles
         </button>
       </div>
+    </section>
+
+    <section class="mt-6 rounded-3xl bg-(--color-paper-raised) p-6">
+      <h2 class="font-(family-name:--font-display) text-lg font-medium">Immich</h2>
+      <p class="mt-1 text-sm text-(--color-ink-soft)">Connect your Immich server to import photos into a journey.</p>
+
+      <div v-if="immichStatus?.connected" class="mt-4 flex items-center justify-between gap-3">
+        <p class="text-sm">
+          Connected to <span class="font-mono text-xs">{{ immichStatus.baseUrl }}</span>
+        </p>
+        <button type="button" class="btn-chip" :disabled="immichSubmitting" @click="disconnectImmich">
+          {{ immichSubmitting ? 'Disconnecting…' : 'Disconnect' }}
+        </button>
+      </div>
+
+      <form v-else class="mt-4 flex max-w-xs flex-col gap-3" @submit.prevent="connectImmich">
+        <label class="flex flex-col gap-1 text-sm text-(--color-ink-soft)">
+          Server URL
+          <input
+            v-model="immichUrl"
+            type="url"
+            placeholder="https://immich.example.com"
+            required
+            class="rounded-lg border border-(--color-line) bg-transparent px-3 py-2 text-sm text-(--color-ink)"
+          />
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-(--color-ink-soft)">
+          API key
+          <input
+            v-model="immichApiKey"
+            type="password"
+            required
+            class="rounded-lg border border-(--color-line) bg-transparent px-3 py-2 text-sm text-(--color-ink)"
+          />
+        </label>
+        <p v-if="immichError" class="m-0 text-sm text-(--color-brick)">{{ immichError }}</p>
+        <button type="submit" :disabled="immichSubmitting" class="btn-primary self-start">
+          {{ immichSubmitting ? 'Connecting…' : 'Connect' }}
+        </button>
+      </form>
     </section>
 
     <section class="mt-6 rounded-3xl bg-(--color-paper-raised) p-6">

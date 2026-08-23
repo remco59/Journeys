@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, uuid, varchar, timestamp } from 'drizzle-orm/pg-core'
+import { pgTable, pgEnum, uuid, varchar, text, timestamp } from 'drizzle-orm/pg-core'
 
 export const userRoleEnum = pgEnum('user_role', ['admin', 'user'])
 export const themeEnum = pgEnum('theme', ['light', 'dark', 'system'])
@@ -11,6 +11,10 @@ export const users = pgTable('users', {
   role: userRoleEnum('role').notNull().default('user'),
   theme: themeEnum('theme').notNull().default('system'),
   distanceUnit: distanceUnitEnum('distance_unit').notNull().default('km'),
+  // Per-user Immich connection (§ Immich integration). The API key is never
+  // stored plaintext — see server/utils/crypto.ts.
+  immichBaseUrl: varchar('immich_base_url', { length: 500 }),
+  immichApiKeyEnc: text('immich_api_key_enc'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 })
 

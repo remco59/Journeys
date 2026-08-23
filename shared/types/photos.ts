@@ -24,3 +24,8 @@ export const setPhotoShowInStorySchema = z.object({
   show: z.boolean()
 })
 export type SetPhotoShowInStoryInput = z.infer<typeof setPhotoShowInStorySchema>
+
+export const importImmichAssetsSchema = z.object({
+  assets: z.array(z.object({ assetId: z.string().uuid(), filename: z.string().min(1).max(500) })).min(1).max(200)
+})
+export type ImportImmichAssetsInput = z.infer<typeof importImmichAssetsSchema>

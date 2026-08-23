@@ -6,6 +6,7 @@ A self-hosted app for turning your travel GPS traces and photos into shareable j
 
 - **Trace import** — GPX, FIT, TCX, and Google Timeline exports, matched to roads/rail via OSRM and Overpass route lookups
 - **Photo library** — EXIF-preserving upload with automatic geotagging against your traces
+- **Immich integration** — connect a self-hosted Immich server per account and import photos into a journey directly from an album or a date range
 - **Journeys & sections** — organize activities and photos into trips with a map + timeline view
 - **Sharing** — generate share links for journeys
 - **Admin** — user management, bootstrap admin account
@@ -68,6 +69,7 @@ Requires Docker and Docker Compose on the host (e.g. Unraid, or any Linux box).
    At minimum, set real values for:
    - `POSTGRES_PASSWORD` — database password
    - `BOOTSTRAP_ADMIN_USERNAME` / `BOOTSTRAP_ADMIN_PASSWORD` — credentials for the admin account created automatically on first boot (see step 4)
+   - `APP_SECRET` — random secret used to encrypt secrets stored at rest, e.g. a user's Immich API key (generate with `openssl rand -hex 32`)
    - `APPDATA_PATH` — host path for persistent data, e.g. `/mnt/user/appdata/journeys` on Unraid (defaults to `./data` if unset)
    - `WEB_PORT` — host port to publish the app on (defaults to `3000`)
 

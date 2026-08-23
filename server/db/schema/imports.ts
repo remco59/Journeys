@@ -4,6 +4,7 @@ import { users } from './users'
 
 export const importSourceTypeEnum = pgEnum('import_source_type', [
   'photo_batch',
+  'immich',
   'google_timeline',
   'gpx',
   'tcx',
