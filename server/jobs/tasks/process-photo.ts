@@ -5,7 +5,7 @@ import { getStorage } from '../../storage'
 import { getPhotoById, applyExtractedMetadata, maybeSetJourneyCover } from '../../domain/photos/photos'
 import { markImportFileStatus } from '../../domain/imports/imports'
 import { extractPhotoMetadata } from '../../domain/photos/exif'
-import { generateDerivedImages } from '../../domain/photos/images'
+import { generateDerivedImages, type DerivedImages } from '../../domain/photos/images'
 import { enqueueJob, type JobPayloads } from '../queue'
 
 // Coalesces bursty uploads: each processed photo re-schedules the same
@@ -25,7 +25,21 @@ export async function processPhotoTask(payload: JobPayloads['process-photo']): P
 
   try {
     const meta = await extractPhotoMetadata(tempPath)
-    const { thumb, preview } = await generateDerivedImages(original)
+
+    let derived: DerivedImages
+    try {
+      derived = await generateDerivedImages(original)
+    } catch (err) {
+      // A decode failure here (corrupt/unsupported HEIC internals, security
+      // limits, etc.) is a deterministic function of this file's bytes —
+      // retrying can never succeed, so fail the import now instead of
+      // letting graphile-worker retry the same doomed decode up to 25 times.
+      if (photo.importFileId) {
+        await markImportFileStatus(photo.importFileId, 'failed', (err as Error).message)
+      }
+      return
+    }
+    const { thumb, preview } = derived
 
     const base = photo.storageKeyOriginal.replace(/\/original\.[^/.]+$/, '')
     const storageKeyThumb = `${base}/thumb.webp`
