@@ -26,9 +26,11 @@ export class ImmichClient {
     return { 'x-api-key': this.apiKey, accept }
   }
 
+  // /api/server/ping doesn't require auth, so it would report "connected"
+  // even for a wrong API key — /api/users/me actually exercises the key.
   async ping(): Promise<boolean> {
     try {
-      const res = await fetch(`${this.baseUrl}/api/server/ping`, {
+      const res = await fetch(`${this.baseUrl}/api/users/me`, {
         headers: this.headers(),
         signal: AbortSignal.timeout(5000)
       })
