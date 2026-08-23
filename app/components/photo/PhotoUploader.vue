@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { UploadTrackerState } from '~/composables/useUploadTracker'
+
 const props = defineProps<{ journeyId: string }>()
 const emit = defineEmits<{ uploaded: [] }>()
 
@@ -12,6 +14,38 @@ const progress = ref<{ current: number; total: number } | null>(null)
 const progressPercent = computed(() =>
   progress.value ? Math.round((progress.value.current / progress.value.total) * 100) : 0
 )
+
+const tracker = useUploadTracker()
+const root = ref<HTMLElement | null>(null)
+const isVisible = ref(true)
+let observer: IntersectionObserver | null = null
+
+// Reflects onto the global tracker whenever this uploader stops being on
+// screen (its dialog closes, or the page it's on gets navigated away from)
+// so PhotoUploadToast knows to pick up where it left off.
+function syncTrackerVisibility() {
+  if (tracker.value.journeyId === props.journeyId && tracker.value.active) {
+    tracker.value.hidden = !isVisible.value
+  }
+}
+
+function updateTracker(patch: Partial<UploadTrackerState>) {
+  tracker.value = { ...tracker.value, journeyId: props.journeyId, hidden: !isVisible.value, ...patch }
+}
+
+onMounted(() => {
+  observer = new IntersectionObserver((entries) => {
+    isVisible.value = entries[entries.length - 1]?.isIntersecting ?? false
+    syncTrackerVisibility()
+  })
+  if (root.value) observer.observe(root.value)
+})
+
+onBeforeUnmount(() => {
+  observer?.disconnect()
+  isVisible.value = false
+  syncTrackerVisibility()
+})
 
 function onUploadClick() {
   if (isNative) {
@@ -30,14 +64,19 @@ async function onNativePick() {
   uploading.value = true
   lastResults.value = []
   progress.value = null
+  updateTracker({ active: true, current: 0, total: 0, error: null })
   try {
     const res = await pickAndUpload(props.journeyId, (p) => {
       progress.value = { current: p.completed, total: p.total }
+      updateTracker({ active: true, current: p.completed, total: p.total })
     })
     lastResults.value = res.files
     emit('uploaded')
+    updateTracker({ active: false, error: null })
   } catch (err: any) {
-    error.value = typeof err?.message === 'string' ? err.message : 'Upload failed.'
+    const message = typeof err?.message === 'string' ? err.message : 'Upload failed.'
+    error.value = message
+    updateTracker({ active: false, error: message })
   } finally {
     uploading.value = false
     progress.value = null
@@ -53,6 +92,7 @@ async function onFilesSelected(event: Event) {
   lastResults.value = []
   const fileList = Array.from(files)
   progress.value = { current: 0, total: fileList.length }
+  updateTracker({ active: true, current: 0, total: fileList.length, error: null })
 
   try {
     for (const file of fileList) {
@@ -65,10 +105,14 @@ async function onFilesSelected(event: Event) {
       )
       lastResults.value.push(...res.files)
       progress.value = { current: progress.value.current + 1, total: fileList.length }
+      updateTracker({ active: true, current: progress.value.current, total: fileList.length })
     }
     emit('uploaded')
+    updateTracker({ active: false, error: null })
   } catch (err: any) {
-    error.value = err?.data?.statusMessage ?? 'Upload failed.'
+    const message = err?.data?.statusMessage ?? 'Upload failed.'
+    error.value = message
+    updateTracker({ active: false, error: message })
   } finally {
     uploading.value = false
     progress.value = null
@@ -78,7 +122,7 @@ async function onFilesSelected(event: Event) {
 </script>
 
 <template>
-  <div class="rounded-2xl border border-dashed border-(--color-stone-line) p-6 text-center">
+  <div ref="root" class="rounded-2xl border border-dashed border-(--color-stone-line) p-6 text-center">
     <input v-if="!isNative" ref="fileInput" type="file" accept="image/*" multiple class="hidden" @change="onFilesSelected" />
     <button class="btn-primary" :disabled="uploading" :class="{ 'animate-pulse-soft': uploading }" @click="onUploadClick">
       {{ uploading ? 'Uploading…' : 'Upload photos' }}
