@@ -42,7 +42,7 @@ async function onEditTrace(traceId: string, transportMode: string) {
 }
 
 const shareDialog = ref<{ open: () => void } | null>(null)
-const addSheet = ref<{ open: (mode?: 'photos' | 'activity' | 'timeline' | 'section') => void } | null>(null)
+const addSheet = ref<{ open: (mode?: 'photos' | 'immich' | 'activity' | 'timeline' | 'section') => void } | null>(null)
 
 provideJourneyActions({
   openShare: () => shareDialog.value?.open(),
@@ -91,7 +91,7 @@ provideJourneyActions({
 
     <ClientOnly>
       <JourneyShareDialog ref="shareDialog" :journey-id="id" />
-      <JourneyAddJourneyContentSheet ref="addSheet" :journey-id="id" :photos="photos ?? []" @refresh="refreshAll" />
+      <JourneyAddJourneyContentSheet ref="addSheet" :journey-id="id" :journey="journey" :photos="photos ?? []" @refresh="refreshAll" />
     </ClientOnly>
   </div>
 </template>

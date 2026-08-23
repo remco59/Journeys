@@ -9,6 +9,7 @@
  */
 export const serverConfig = {
   databaseUrl: process.env.DATABASE_URL,
+  appSecret: process.env.APP_SECRET,
   storageDriver: (process.env.STORAGE_DRIVER || 'local') as 'local' | 's3',
   localStoragePath: process.env.LOCAL_STORAGE_PATH || './.data/photos',
   s3: {

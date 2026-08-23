@@ -29,6 +29,12 @@ export const updateSettingsSchema = z.object({
 })
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>
 
+export const updateImmichSettingsSchema = z.object({
+  baseUrl: z.string().url().max(500),
+  apiKey: z.string().min(1).max(500)
+})
+export type UpdateImmichSettingsInput = z.infer<typeof updateImmichSettingsSchema>
+
 export const updateUsernameSchema = z.object({
   username: z.string().min(3).max(64).regex(/^[a-z0-9._-]+$/i, 'Letters, numbers, dots, dashes and underscores only')
 })

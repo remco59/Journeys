@@ -1,15 +1,6 @@
-import { createHash } from 'node:crypto'
 import { getJourneyForOwner } from '../../../domain/journeys/journeys'
-import { createImport, completeImport, createImportFile, findExistingImportFileByChecksum } from '../../../domain/imports/imports'
-import { createPendingPhoto } from '../../../domain/photos/photos'
-import { validateImageUpload } from '../../../domain/photos/upload-validation'
-import { getStorage } from '../../../storage'
-import { enqueueJob } from '../../../jobs/queue'
-
-type UploadResult =
-  | { filename: string; status: 'queued'; photoId: string }
-  | { filename: string; status: 'duplicate' }
-  | { filename: string; status: 'rejected'; reason: string }
+import { createImport, completeImport } from '../../../domain/imports/imports'
+import { ingestPhotoBuffer, type IngestResult } from '../../../domain/photos/ingest'
 
 export default defineEventHandler(async (event) => {
   const user = requireUser(event)
@@ -26,42 +17,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'No files uploaded' })
   }
 
-  const storage = getStorage()
   const importRow = await createImport(journeyId, 'photo_batch', user.id)
-  const results: UploadResult[] = []
+  const results: IngestResult[] = []
 
   for (const part of fileParts) {
-    const filename = part.filename!
-    try {
-      const { mimeType, extension } = await validateImageUpload(part.data)
-      const checksum = createHash('sha256').update(part.data).digest('hex')
-
-      const existing = await findExistingImportFileByChecksum(journeyId, checksum)
-      if (existing) {
-        results.push({ filename, status: 'duplicate' })
-        continue
-      }
-
-      const storageKey = `${journeyId}/${checksum}/original${extension}`
-      await storage.put(storageKey, part.data, { contentType: mimeType })
-
-      const importFile = await createImportFile({
-        importId: importRow.id,
-        journeyId,
-        originalFilename: filename,
-        storageKey,
-        mimeType,
-        sizeBytes: part.data.length,
-        checksumSha256: checksum
-      })
-
-      const photo = await createPendingPhoto({ journeyId, importFileId: importFile.id, storageKeyOriginal: storageKey })
-      await enqueueJob('process-photo', { photoId: photo.id })
-
-      results.push({ filename, status: 'queued', photoId: photo.id })
-    } catch (err) {
-      results.push({ filename, status: 'rejected', reason: (err as Error).message })
-    }
+    results.push(await ingestPhotoBuffer(journeyId, importRow.id, part.filename!, part.data))
   }
 
   await completeImport(importRow.id, {
